@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import {
-  signInAnonymously,
+  signInWithPopup,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signOut as firebaseSignOut,
   User as FirebaseUser
 } from 'firebase/auth'
 import {
@@ -18,14 +20,18 @@ import { auth, db } from '@/lib/firebase'
 interface UserData {
   id: string
   displayName: string
-  odcreatedAt: Date
+  email: string
+  createdAt: Date
 }
 
 interface AuthContextType {
   user: FirebaseUser | null
   userData: UserData | null
   loading: boolean
-  registerUser: (displayName: string) => Promise<{ success: boolean; error?: string }>
+  needsUsername: boolean
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>
+  signOut: () => Promise<void>
+  setUsername: (displayName: string) => Promise<{ success: boolean; error?: string }>
   checkUsernameAvailable: (displayName: string) => Promise<boolean>
 }
 
@@ -35,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [needsUsername, setNeedsUsername] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -48,13 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserData({
             id: firebaseUser.uid,
             displayName: data.displayName,
-            odcreatedAt: data.createdAt?.toDate() || new Date()
+            email: data.email || firebaseUser.email || '',
+            createdAt: data.createdAt?.toDate() || new Date()
           })
+          setNeedsUsername(false)
         } else {
+          // User is logged in but hasn't set username yet
           setUserData(null)
+          setNeedsUsername(true)
         }
       } else {
         setUserData(null)
+        setNeedsUsername(false)
       }
 
       setLoading(false)
@@ -73,19 +85,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return querySnapshot.empty
   }
 
-  const registerUser = async (displayName: string): Promise<{ success: boolean; error?: string }> => {
+  const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Sign in anonymously if not already signed in
-      let currentUser = auth.currentUser
+      const provider = new GoogleAuthProvider()
+      await signInWithPopup(auth, provider)
+      return { success: true }
+    } catch (error) {
+      console.error('Error signing in with Google:', error)
+      return { success: false, error: 'Failed to sign in with Google' }
+    }
+  }
+
+  const signOut = async (): Promise<void> => {
+    await firebaseSignOut(auth)
+    setUserData(null)
+    setNeedsUsername(false)
+  }
+
+  const setUsername = async (displayName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const currentUser = auth.currentUser
       if (!currentUser) {
-        const result = await signInAnonymously(auth)
-        currentUser = result.user
+        return { success: false, error: 'Not authenticated' }
       }
 
       // Check if username is available
       const isAvailable = await checkUsernameAvailable(displayName)
       if (!isAvailable) {
-        return { success: false, error: 'Questo ID utente è già in uso' }
+        return { success: false, error: 'This username is already taken' }
       }
 
       // Create user document
@@ -95,24 +122,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setDoc(userDocRef, {
         displayName: displayName.trim(),
         displayNameLower: displayName.toLowerCase().trim(),
+        email: currentUser.email || '',
+        emailLower: (currentUser.email || '').toLowerCase(),
         createdAt: now
       })
 
       setUserData({
         id: currentUser.uid,
         displayName: displayName.trim(),
-        odcreatedAt: now
+        email: currentUser.email || '',
+        createdAt: now
       })
+      setNeedsUsername(false)
 
       return { success: true }
     } catch (error) {
-      console.error('Error registering user:', error)
-      return { success: false, error: 'Errore durante la registrazione' }
+      console.error('Error setting username:', error)
+      return { success: false, error: 'Failed to set username' }
     }
   }
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, registerUser, checkUsernameAvailable }}>
+    <AuthContext.Provider value={{
+      user,
+      userData,
+      loading,
+      needsUsername,
+      signInWithGoogle,
+      signOut,
+      setUsername,
+      checkUsernameAvailable
+    }}>
       {children}
     </AuthContext.Provider>
   )

@@ -33,8 +33,6 @@ import {
   Bell,
   LogOut
 } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
 
 interface Friend {
   odid: string
@@ -50,11 +48,17 @@ interface FriendRequest {
   status: string
 }
 
+interface SearchResult {
+  id: string
+  displayName: string
+  email?: string
+}
+
 export default function HomePage() {
-  const { user, userData } = useAuth()
+  const { user, userData, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{ id: string; displayName: string }[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [friends, setFriends] = useState<Friend[]>([])
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([])
@@ -141,25 +145,46 @@ export default function HomePage() {
 
     setSearching(true)
     try {
-      const usersQuery = query(
+      const searchLower = searchQuery.toLowerCase().trim()
+      const resultsMap = new Map<string, SearchResult>()
+
+      // Search by username
+      const usernameQuery = query(
         collection(db, 'users'),
-        where('displayNameLower', '>=', searchQuery.toLowerCase().trim()),
-        where('displayNameLower', '<=', searchQuery.toLowerCase().trim() + '\uf8ff')
+        where('displayNameLower', '>=', searchLower),
+        where('displayNameLower', '<=', searchLower + '\uf8ff')
       )
-
-      const snapshot = await getDocs(usersQuery)
-      const results: { id: string; displayName: string }[] = []
-
-      snapshot.forEach((doc) => {
+      const usernameSnapshot = await getDocs(usernameQuery)
+      usernameSnapshot.forEach((doc) => {
         if (doc.id !== user?.uid) {
-          results.push({
+          const data = doc.data()
+          resultsMap.set(doc.id, {
             id: doc.id,
-            displayName: doc.data().displayName
+            displayName: data.displayName,
+            email: data.email
           })
         }
       })
 
-      setSearchResults(results)
+      // Search by email
+      const emailQuery = query(
+        collection(db, 'users'),
+        where('emailLower', '>=', searchLower),
+        where('emailLower', '<=', searchLower + '\uf8ff')
+      )
+      const emailSnapshot = await getDocs(emailQuery)
+      emailSnapshot.forEach((doc) => {
+        if (doc.id !== user?.uid && !resultsMap.has(doc.id)) {
+          const data = doc.data()
+          resultsMap.set(doc.id, {
+            id: doc.id,
+            displayName: data.displayName,
+            email: data.email
+          })
+        }
+      })
+
+      setSearchResults(Array.from(resultsMap.values()))
     } catch (error) {
       console.error('Error searching users:', error)
     }
@@ -249,8 +274,7 @@ export default function HomePage() {
   }
 
   const handleLogout = async () => {
-    await signOut(auth)
-    window.location.reload()
+    await signOut()
   }
 
   const isAlreadyFriend = (userId: string) => {
@@ -283,7 +307,7 @@ export default function HomePage() {
             <CardHeader className="py-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Bell className="h-5 w-5" />
-                Richieste di amicizia ({pendingRequests.length})
+                Friend Requests ({pendingRequests.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -320,20 +344,20 @@ export default function HomePage() {
           <DialogTrigger asChild>
             <Button className="w-full" variant="secondary">
               <UserPlus className="mr-2 h-5 w-5" />
-              Aggiungi Amico
+              Add Friend
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Cerca Amico</DialogTitle>
+              <DialogTitle>Search Friend</DialogTitle>
               <DialogDescription>
-                Cerca un utente tramite il suo ID per inviare una richiesta di amicizia
+                Search by username or email to send a friend request
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Cerca ID utente..."
+                  placeholder="Username or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
@@ -354,11 +378,16 @@ export default function HomePage() {
                       key={result.id}
                       className="flex items-center justify-between border-3 border-foreground p-3 bg-white"
                     >
-                      <span className="font-semibold">{result.displayName}</span>
+                      <div>
+                        <span className="font-semibold block">{result.displayName}</span>
+                        {result.email && (
+                          <span className="text-xs text-gray-500">{result.email}</span>
+                        )}
+                      </div>
                       {isAlreadyFriend(result.id) ? (
-                        <span className="text-sm text-success font-medium">Amico</span>
+                        <span className="text-sm text-success font-medium">Friend</span>
                       ) : hasSentRequest(result.id) ? (
-                        <span className="text-sm text-gray-500">Richiesta inviata</span>
+                        <span className="text-sm text-gray-500">Request sent</span>
                       ) : (
                         <Button
                           size="sm"
@@ -379,7 +408,7 @@ export default function HomePage() {
 
               {searchResults.length === 0 && searchQuery && !searching && (
                 <p className="text-center text-gray-500 py-4">
-                  Nessun utente trovato
+                  No users found
                 </p>
               )}
             </div>
@@ -391,13 +420,13 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              I tuoi Amici ({friends.length})
+              Your Friends ({friends.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {friends.length === 0 ? (
               <p className="text-center text-gray-500 py-8">
-                Non hai ancora amici. Cercane uno per iniziare!
+                No friends yet. Search for someone to get started!
               </p>
             ) : (
               <div className="space-y-2">
