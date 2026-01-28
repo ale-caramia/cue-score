@@ -1,28 +1,28 @@
 # Cue Score
 
-Una PWA per tracciare i punteggi delle partite tra amici con stile neobrutalista.
+A PWA for tracking match scores between friends with a neobrutal design.
 
-## Funzionalita
+## Features
 
-- **Autenticazione**: Registrazione con ID utente univoco
-- **Sistema Amicizia**: Cerca utenti, invia richieste di amicizia, accetta/rifiuta
-- **Registrazione Partite**: Registra partite con data e vincitore
-- **Statistiche**: Visualizza statistiche giornaliere, settimanali, mensili e annuali
-- **Cronologia**: Visualizza ed elimina partite passate
-- **PWA**: Installabile su dispositivi mobili, funziona offline
+- **Authentication**: Registration with unique user ID
+- **Friendship System**: Search users, send friend requests, accept/reject
+- **Match Recording**: Record matches with date and winner
+- **Statistics**: View daily, weekly, monthly, and yearly stats
+- **History**: View and delete past matches
+- **PWA**: Installable on mobile devices, works offline
 
-## Stack Tecnologico
+## Tech Stack
 
 - React 19 + TypeScript
 - Vite
 - TailwindCSS
-- shadcn/ui (componenti personalizzati)
+- shadcn/ui (custom components)
 - Firebase (Auth + Firestore)
 - vite-plugin-pwa
 
 ## Setup
 
-### 1. Clona il repository
+### 1. Clone the repository
 
 ```bash
 git clone <repo-url>
@@ -30,20 +30,20 @@ cd cue-score
 npm install
 ```
 
-### 2. Configura Firebase
+### 2. Configure Firebase
 
-1. Crea un progetto su [Firebase Console](https://console.firebase.google.com/)
-2. Abilita **Anonymous Authentication**
-3. Crea un database **Firestore**
-4. Copia le credenziali del progetto
+1. Create a project on [Firebase Console](https://console.firebase.google.com/)
+2. Enable **Anonymous Authentication**
+3. Create a **Firestore** database
+4. Copy the project credentials
 
-### 3. Configura le variabili d'ambiente
+### 3. Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-Modifica `.env` con le tue credenziali Firebase:
+Edit `.env` with your Firebase credentials:
 
 ```env
 VITE_FIREBASE_API_KEY=your-api-key
@@ -54,57 +54,57 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
 VITE_FIREBASE_APP_ID=1:123456789:web:abc123
 ```
 
-### 4. Configura le regole Firestore
+### 4. Configure Firestore rules
 
-Copia il contenuto di `firestore.rules` nelle regole del tuo database Firestore.
+Copy the content of `firestore.rules` into your Firestore database rules.
 
-### 5. Crea gli indici Firestore
+### 5. Create Firestore indexes
 
-Crea i seguenti indici compositi in Firestore:
+Create the following composite indexes in Firestore:
 
 **Collection: matches**
 - Fields: `players` (Array contains), `date` (Descending)
 
-### 6. Avvia l'applicazione
+### 6. Start the application
 
 ```bash
 npm run dev
 ```
 
-## Build per produzione
+## Production Build
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## Struttura del Progetto
+## Project Structure
 
 ```
 src/
 ├── components/
-│   └── ui/           # Componenti UI (Button, Card, Dialog, etc.)
+│   └── ui/              # UI components (Button, Card, Dialog, etc.)
 ├── contexts/
-│   └── AuthContext.tsx  # Context per autenticazione
+│   └── AuthContext.tsx  # Authentication context
 ├── lib/
-│   ├── firebase.ts   # Configurazione Firebase
-│   ├── types.ts      # TypeScript types
-│   └── utils.ts      # Utility functions
+│   ├── firebase.ts      # Firebase configuration
+│   ├── types.ts         # TypeScript types
+│   └── utils.ts         # Utility functions
 ├── pages/
-│   ├── LoginPage.tsx    # Pagina di registrazione
-│   ├── HomePage.tsx     # Lista amici e richieste
-│   └── FriendPage.tsx   # Statistiche e partite con un amico
-├── App.tsx           # Router e layout principale
-├── main.tsx          # Entry point
-└── index.css         # Stili globali e Tailwind
+│   ├── LoginPage.tsx    # Registration page
+│   ├── HomePage.tsx     # Friends list and requests
+│   └── FriendPage.tsx   # Stats and matches with a friend
+├── App.tsx              # Router and main layout
+├── main.tsx             # Entry point
+└── index.css            # Global styles and Tailwind
 ```
 
 ## Design
 
-L'applicazione utilizza uno stile **neobrutalista** caratterizzato da:
+The app uses a **neobrutal** style characterized by:
 
-- Bordi spessi e netti
-- Ombre "brutal" offset
-- Colori vivaci e contrastanti
-- Font bold e grassetto
-- Interazioni con effetto "pressed"
+- Thick, sharp borders
+- Offset "brutal" shadows
+- Vibrant, contrasting colors
+- Bold fonts
+- "Pressed" interaction effects
