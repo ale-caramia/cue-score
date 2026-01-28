@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      // Anyone can read users (for searching)
+      allow read: if request.auth != null;
+      // Only the user can write their own document
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Friend requests collection
+    match /friendRequests/{requestId} {
+      // Users can read requests they sent or received
+      allow read: if request.auth != null &&
+        (resource.data.fromUserId == request.auth.uid ||
+         resource.data.toUserId == request.auth.uid);
+      // Authenticated users can create requests
+      allow create: if request.auth != null &&
+        request.resource.data.fromUserId == request.auth.uid;
+      // Only sender or receiver can delete
+      allow delete: if request.auth != null &&
+        (resource.data.fromUserId == request.auth.uid ||
+         resource.data.toUserId == request.auth.uid);
+    }
+
+    // Friends collection
+    match /friends/{friendId} {
+      // Users can read their own friend entries
+      allow read: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      // Users can create friend entries for themselves
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      // Users can delete their own friend entries
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // Matches collection
+    match /matches/{matchId} {
+      // Players can read matches they participated in
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.players;
+      // Authenticated users can create matches where they are a player
+      allow create: if request.auth != null &&
+        request.auth.uid in request.resource.data.players;
+      // Only the creator can delete
+      allow delete: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+    }
+  }
+}
