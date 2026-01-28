@@ -20,7 +20,9 @@ import {
   addDoc,
   deleteDoc,
   doc,
-  onSnapshot
+  onSnapshot,
+  getDoc,
+  writeBatch
 } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -65,6 +67,9 @@ export default function HomePage() {
   const [sentRequests, setSentRequests] = useState<string[]>([])
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
   const [sendingRequest, setSendingRequest] = useState<string | null>(null)
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null
+  )
 
   // Load friends
   useEffect(() => {
@@ -239,37 +244,71 @@ export default function HomePage() {
 
   const acceptFriendRequest = async (request: FriendRequest) => {
     if (!user || !userData) return
+    if (processingRequestId) return
 
+    setProcessingRequestId(request.id)
     try {
-      // Add friend for both users
-      await addDoc(collection(db, 'friends'), {
-        userId: user.uid,
-        userName: userData.displayName,
-        friendId: request.fromUserId,
-        friendName: request.fromUserName,
-        addedAt: new Date()
-      })
+      const requestRef = doc(db, 'friendRequests', request.id)
+      const requestSnapshot = await getDoc(requestRef)
+      if (!requestSnapshot.exists()) return
+      const requestData = requestSnapshot.data()
+      if (requestData.status !== 'pending') return
 
-      await addDoc(collection(db, 'friends'), {
-        userId: request.fromUserId,
-        userName: request.fromUserName,
-        friendId: user.uid,
-        friendName: userData.displayName,
-        addedAt: new Date()
-      })
+      const friendCheckCurrent = query(
+        collection(db, 'friends'),
+        where('userId', '==', user.uid),
+        where('friendId', '==', request.fromUserId)
+      )
+      const friendCheckSender = query(
+        collection(db, 'friends'),
+        where('userId', '==', request.fromUserId),
+        where('friendId', '==', user.uid)
+      )
+      const [currentSnapshot, senderSnapshot] = await Promise.all([
+        getDocs(friendCheckCurrent),
+        getDocs(friendCheckSender)
+      ])
+
+      const batch = writeBatch(db)
+      if (currentSnapshot.empty) {
+        batch.set(doc(collection(db, 'friends')), {
+          userId: user.uid,
+          userName: userData.displayName,
+          friendId: request.fromUserId,
+          friendName: request.fromUserName,
+          addedAt: new Date()
+        })
+      }
+      if (senderSnapshot.empty) {
+        batch.set(doc(collection(db, 'friends')), {
+          userId: request.fromUserId,
+          userName: request.fromUserName,
+          friendId: user.uid,
+          friendName: userData.displayName,
+          addedAt: new Date()
+        })
+      }
 
       // Delete the request
-      await deleteDoc(doc(db, 'friendRequests', request.id))
+      batch.delete(requestRef)
+      await batch.commit()
     } catch (error) {
       console.error('Error accepting friend request:', error)
+    } finally {
+      setProcessingRequestId(null)
     }
   }
 
   const rejectFriendRequest = async (request: FriendRequest) => {
+    if (processingRequestId) return
+
+    setProcessingRequestId(request.id)
     try {
       await deleteDoc(doc(db, 'friendRequests', request.id))
     } catch (error) {
       console.error('Error rejecting friend request:', error)
+    } finally {
+      setProcessingRequestId(null)
     }
   }
 
@@ -322,15 +361,25 @@ export default function HomePage() {
                       size="sm"
                       variant="secondary"
                       onClick={() => acceptFriendRequest(request)}
+                      disabled={processingRequestId === request.id}
                     >
-                      <Check className="h-4 w-4" />
+                      {processingRequestId === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
                       onClick={() => rejectFriendRequest(request)}
+                      disabled={processingRequestId === request.id}
                     >
-                      <X className="h-4 w-4" />
+                      {processingRequestId === request.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
