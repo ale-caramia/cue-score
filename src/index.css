@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-foreground;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-brutal {
+    @apply px-6 py-3 font-semibold border-3 border-foreground bg-primary text-foreground
+           shadow-brutal transition-all duration-150 ease-in-out
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-brutal-secondary {
+    @apply px-6 py-3 font-semibold border-3 border-foreground bg-secondary text-foreground
+           shadow-brutal transition-all duration-150 ease-in-out
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .btn-brutal-accent {
+    @apply px-6 py-3 font-semibold border-3 border-foreground bg-accent text-foreground
+           shadow-brutal transition-all duration-150 ease-in-out
+           hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-sm
+           active:translate-x-[4px] active:translate-y-[4px] active:shadow-none;
+  }
+
+  .card-brutal {
+    @apply bg-card border-3 border-foreground shadow-brutal p-4;
+  }
+
+  .input-brutal {
+    @apply w-full px-4 py-3 border-3 border-foreground bg-white
+           focus:outline-none focus:ring-0 focus:shadow-brutal-sm
+           placeholder:text-gray-400;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-foreground border-2 border-background;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
