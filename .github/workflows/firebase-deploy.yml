@@ -1,17 +1,9 @@
-name: Deploy to Firebase Hosting
+name: Deploy to Firebase
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-
-permissions:
-  checks: write
-  contents: read
-  pull-requests: write
 
 jobs:
   build-and-deploy:
@@ -40,16 +32,14 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
         run: npm run build
 
-      - name: Deploy to Firebase Hosting (Preview)
-        if: github.event_name == 'pull_request'
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Deploy Firestore Rules
+        uses: w9jds/firebase-action@master
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          args: deploy --only firestore:rules
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy to Firebase Hosting (Production)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

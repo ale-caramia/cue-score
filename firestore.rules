@@ -30,9 +30,11 @@ service cloud.firestore {
       // Users can read their own friend entries
       allow read: if request.auth != null &&
         resource.data.userId == request.auth.uid;
-      // Users can create friend entries for themselves
+      // Users can create friend entries for themselves OR when accepting a friend request
+      // (when accepting, B creates A's record where friendId is B)
       allow create: if request.auth != null &&
-        request.resource.data.userId == request.auth.uid;
+        (request.resource.data.userId == request.auth.uid ||
+         request.resource.data.friendId == request.auth.uid);
       // Users can delete their own friend entries
       allow delete: if request.auth != null &&
         resource.data.userId == request.auth.uid;
