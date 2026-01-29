@@ -27,9 +27,10 @@ service cloud.firestore {
 
     // Friends collection
     match /friends/{friendId} {
-      // Users can read their own friend entries
+      // Users can read friend entries where they are involved (as userId OR friendId)
       allow read: if request.auth != null &&
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid ||
+         resource.data.friendId == request.auth.uid);
       // Users can create friend entries for themselves OR when accepting a friend request
       // (when accepting, B creates A's record where friendId is B)
       allow create: if request.auth != null &&
