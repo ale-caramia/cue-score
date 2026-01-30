@@ -243,17 +243,36 @@ export default function HomePage() {
   }
 
   const acceptFriendRequest = async (request: FriendRequest) => {
-    if (!user || !userData) return
-    if (processingRequestId) return
+    console.log('acceptFriendRequest called', { request, user: user?.uid, userData })
+    if (!user || !userData) {
+      console.error('No user or userData')
+      alert('Error: No user data')
+      return
+    }
+    if (processingRequestId) {
+      console.log('Already processing:', processingRequestId)
+      return
+    }
 
     setProcessingRequestId(request.id)
     try {
+      console.log('Step 1: Getting request document')
       const requestRef = doc(db, 'friendRequests', request.id)
       const requestSnapshot = await getDoc(requestRef)
-      if (!requestSnapshot.exists()) return
+      if (!requestSnapshot.exists()) {
+        console.error('Request does not exist')
+        alert('Error: Request no longer exists')
+        return
+      }
       const requestData = requestSnapshot.data()
-      if (requestData.status !== 'pending') return
+      console.log('Request data:', requestData)
+      if (requestData.status !== 'pending') {
+        console.error('Request is not pending:', requestData.status)
+        alert('Error: Request is not pending')
+        return
+      }
 
+      console.log('Step 2: Checking existing friendships')
       const friendCheckCurrent = query(
         collection(db, 'friends'),
         where('userId', '==', user.uid),
@@ -264,13 +283,21 @@ export default function HomePage() {
         where('userId', '==', request.fromUserId),
         where('friendId', '==', user.uid)
       )
+
+      console.log('Executing queries...')
       const [currentSnapshot, senderSnapshot] = await Promise.all([
         getDocs(friendCheckCurrent),
         getDocs(friendCheckSender)
       ])
+      console.log('Query results:', {
+        currentEmpty: currentSnapshot.empty,
+        senderEmpty: senderSnapshot.empty
+      })
 
+      console.log('Step 3: Creating batch')
       const batch = writeBatch(db)
       if (currentSnapshot.empty) {
+        console.log('Adding friend entry for current user')
         batch.set(doc(collection(db, 'friends')), {
           userId: user.uid,
           userName: userData.displayName,
@@ -280,6 +307,7 @@ export default function HomePage() {
         })
       }
       if (senderSnapshot.empty) {
+        console.log('Adding friend entry for sender')
         batch.set(doc(collection(db, 'friends')), {
           userId: request.fromUserId,
           userName: request.fromUserName,
@@ -289,24 +317,35 @@ export default function HomePage() {
         })
       }
 
-      // Delete the request
+      console.log('Step 4: Deleting request and committing batch')
       batch.delete(requestRef)
       await batch.commit()
+      console.log('SUCCESS: Friend request accepted!')
+      alert('Friend request accepted!')
     } catch (error) {
       console.error('Error accepting friend request:', error)
+      alert('Error accepting friend request: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setProcessingRequestId(null)
     }
   }
 
   const rejectFriendRequest = async (request: FriendRequest) => {
-    if (processingRequestId) return
+    console.log('rejectFriendRequest called', { request })
+    if (processingRequestId) {
+      console.log('Already processing:', processingRequestId)
+      return
+    }
 
     setProcessingRequestId(request.id)
     try {
+      console.log('Deleting friend request')
       await deleteDoc(doc(db, 'friendRequests', request.id))
+      console.log('SUCCESS: Friend request rejected!')
+      alert('Friend request rejected!')
     } catch (error) {
       console.error('Error rejecting friend request:', error)
+      alert('Error rejecting friend request: ' + (error instanceof Error ? error.message : String(error)))
     } finally {
       setProcessingRequestId(null)
     }
