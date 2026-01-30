@@ -51,6 +51,7 @@ import {
   Users,
   Medal,
   Info,
+  MoreVertical,
 } from 'lucide-react'
 import {
   formatDate,
@@ -241,10 +242,8 @@ export default function GroupPage() {
 
     setDeletingGroup(true)
     try {
+      // First, delete all related documents (members, matches, preferences)
       const batch = writeBatch(db)
-
-      // Delete the group document
-      batch.delete(doc(db, 'groups', groupId))
 
       // Delete all group members
       const membersSnapshot = await getDocs(
@@ -270,8 +269,12 @@ export default function GroupPage() {
         batch.delete(doc.ref)
       })
 
-      // Commit the batch
+      // Commit the batch for related documents
       await batch.commit()
+
+      // Finally, delete the group document separately
+      // This must be done AFTER deleting related docs because the rules use get()
+      await deleteDoc(doc(db, 'groups', groupId))
 
       // Navigate back to groups list
       navigate('/groups')
@@ -322,14 +325,26 @@ export default function GroupPage() {
             <Users className="h-6 w-6" />
             {group.name}
           </h1>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setInfoDialogOpen(true)}
-            className="h-10 w-10"
-          >
-            <Info className="h-5 w-5" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setInfoDialogOpen(true)}
+              className="h-10 w-10"
+            >
+              <Info className="h-5 w-5" />
+            </Button>
+            {user && group.createdBy === user.uid && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setDeleteGroupOpen(true)}
+                className="h-10 w-10 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -560,32 +575,6 @@ export default function GroupPage() {
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* Delete Group (Admin Only) */}
-        {user && group.createdBy === user.uid && (
-          <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="text-destructive flex items-center gap-2">
-                <Trash2 className="h-5 w-5" />
-                Zona Pericolo
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Eliminare il gruppo comporterà la cancellazione di tutti i membri,
-                partite e dati associati. Questa azione non può essere annullata.
-              </p>
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteGroupOpen(true)}
-                className="w-full"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Elimina Gruppo
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Delete Group Confirmation */}
         <AlertDialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen}>
