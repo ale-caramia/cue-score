@@ -39,6 +39,7 @@ import {
   updateDoc,
   arrayUnion,
   setDoc,
+  writeBatch,
 } from 'firebase/firestore'
 import {
   ArrowLeft,
@@ -77,6 +78,8 @@ export default function GroupPage() {
   const [addMatchOpen, setAddMatchOpen] = useState(false)
   const [deleteMatchId, setDeleteMatchId] = useState<string | null>(null)
   const [infoDialogOpen, setInfoDialogOpen] = useState(false)
+  const [deleteGroupOpen, setDeleteGroupOpen] = useState(false)
+  const [deletingGroup, setDeletingGroup] = useState(false)
 
   // Load group details
   useEffect(() => {
@@ -226,6 +229,58 @@ export default function GroupPage() {
     } catch (error) {
       console.error('Error deleting match:', error)
       alert('Errore durante la cancellazione della partita.')
+    }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!user || !groupId || !group) return
+    if (group.createdBy !== user.uid) {
+      alert('Solo l\'admin può eliminare il gruppo.')
+      return
+    }
+
+    setDeletingGroup(true)
+    try {
+      const batch = writeBatch(db)
+
+      // Delete the group document
+      batch.delete(doc(db, 'groups', groupId))
+
+      // Delete all group members
+      const membersSnapshot = await getDocs(
+        query(collection(db, 'groupMembers'), where('groupId', '==', groupId))
+      )
+      membersSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      // Delete all group matches
+      const matchesSnapshot = await getDocs(
+        query(collection(db, 'groupMatches'), where('groupId', '==', groupId))
+      )
+      matchesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      // Delete all user preferences for this group
+      const preferencesSnapshot = await getDocs(
+        query(collection(db, 'userGroupPreferences'), where('groupId', '==', groupId))
+      )
+      preferencesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      // Commit the batch
+      await batch.commit()
+
+      // Navigate back to groups list
+      navigate('/groups')
+    } catch (error) {
+      console.error('Error deleting group:', error)
+      alert('Errore durante l\'eliminazione del gruppo.')
+    } finally {
+      setDeletingGroup(false)
+      setDeleteGroupOpen(false)
     }
   }
 
@@ -505,6 +560,62 @@ export default function GroupPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Group (Admin Only) */}
+        {user && group.createdBy === user.uid && (
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Zona Pericolo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Eliminare il gruppo comporterà la cancellazione di tutti i membri,
+                partite e dati associati. Questa azione non può essere annullata.
+              </p>
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteGroupOpen(true)}
+                className="w-full"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Elimina Gruppo
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Delete Group Confirmation */}
+        <AlertDialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminare il gruppo "{group.name}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione è irreversibile. Tutti i dati del gruppo verranno
+                eliminati definitivamente:
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>{members.length} membri</li>
+                  <li>{matches.length} partite</li>
+                  <li>Tutte le statistiche e classifiche</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingGroup}>
+                Annulla
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteGroup}
+                disabled={deletingGroup}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletingGroup ? 'Eliminazione...' : 'Elimina Definitivamente'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
