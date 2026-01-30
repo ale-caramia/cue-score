@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { LanguageProvider } from '@/contexts/I18nContext'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import FriendPage from '@/pages/FriendPage'
 import GroupsPage from '@/pages/GroupsPage'
 import GroupPage from '@/pages/GroupPage'
+import TournamentsPage from '@/pages/TournamentsPage'
 import { Loader2 } from 'lucide-react'
 
 function LoadingScreen() {
@@ -37,6 +39,7 @@ function ProtectedRoutes() {
       <Route path="/friend/:friendId" element={<FriendPage />} />
       <Route path="/groups" element={<GroupsPage />} />
       <Route path="/groups/:groupId" element={<GroupPage />} />
+      <Route path="/tournaments" element={<TournamentsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -45,9 +48,11 @@ function ProtectedRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ProtectedRoutes />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <ProtectedRoutes />
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   )
 }
