@@ -78,9 +78,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       // Authenticated users can create memberships
       allow create: if request.auth != null;
-      // Only the user themselves can delete their membership
+      // Only the user themselves OR the group admin can delete their membership
       allow delete: if request.auth != null &&
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid ||
+         request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
     }
 
     // Group matches collection
@@ -91,9 +92,10 @@ service cloud.firestore {
       // Authenticated users can create matches where they are a player
       allow create: if request.auth != null &&
         request.auth.uid in request.resource.data.allPlayerIds;
-      // Only the creator can delete
+      // Only the creator OR the group admin can delete
       allow delete: if request.auth != null &&
-        resource.data.createdBy == request.auth.uid;
+        (resource.data.createdBy == request.auth.uid ||
+         request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
     }
 
     // User group preferences collection
@@ -104,9 +106,10 @@ service cloud.firestore {
       // Users can only create/update their own preferences
       allow create, update: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
-      // Users can delete their own preferences
+      // Users can delete their own preferences OR group admin can delete when deleting group
       allow delete: if request.auth != null &&
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid ||
+         request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
     }
   }
 }
