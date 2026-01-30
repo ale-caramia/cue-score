@@ -1,0 +1,814 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { db } from '@/lib/firebase'
+import {
+  collection,
+  query,
+  where,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  getDoc,
+  getDocs,
+  Timestamp,
+  updateDoc,
+  arrayUnion,
+  setDoc,
+} from 'firebase/firestore'
+import {
+  ArrowLeft,
+  Trophy,
+  Plus,
+  Calendar,
+  Trash2,
+  UserPlus,
+  Users,
+  Medal,
+  Info,
+} from 'lucide-react'
+import {
+  formatDate,
+  getStartOfDay,
+  getStartOfWeek,
+  getStartOfMonth,
+  getStartOfYear,
+  calculateGroupRankings,
+  calculateMatchPoints,
+} from '@/lib/utils'
+import type { Group, GroupMember, GroupMatch, GroupRanking } from '@/lib/types'
+
+type PeriodView = 'day' | 'week' | 'month' | 'year'
+
+export default function GroupPage() {
+  const { groupId } = useParams<{ groupId: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [group, setGroup] = useState<Group | null>(null)
+  const [members, setMembers] = useState<GroupMember[]>([])
+  const [matches, setMatches] = useState<GroupMatch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [currentView, setCurrentView] = useState<PeriodView>('week')
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const [addMatchOpen, setAddMatchOpen] = useState(false)
+  const [deleteMatchId, setDeleteMatchId] = useState<string | null>(null)
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false)
+
+  // Load group details
+  useEffect(() => {
+    if (!groupId) return
+
+    const unsubscribe = onSnapshot(doc(db, 'groups', groupId), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data()
+        setGroup({
+          id: snapshot.id,
+          name: data.name,
+          createdBy: data.createdBy,
+          createdAt: data.createdAt.toDate(),
+          memberIds: data.memberIds || [],
+        })
+      }
+    })
+
+    return () => unsubscribe()
+  }, [groupId])
+
+  // Load group members
+  useEffect(() => {
+    if (!groupId) return
+
+    const membersQuery = query(
+      collection(db, 'groupMembers'),
+      where('groupId', '==', groupId)
+    )
+
+    const unsubscribe = onSnapshot(membersQuery, (snapshot) => {
+      const membersList: GroupMember[] = []
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        membersList.push({
+          id: doc.id,
+          groupId: data.groupId,
+          userId: data.userId,
+          userName: data.userName,
+          joinedAt: data.joinedAt.toDate(),
+        })
+      })
+      setMembers(membersList)
+    })
+
+    return () => unsubscribe()
+  }, [groupId])
+
+  // Load group matches
+  useEffect(() => {
+    if (!groupId) return
+
+    const matchesQuery = query(
+      collection(db, 'groupMatches'),
+      where('groupId', '==', groupId),
+      orderBy('date', 'desc')
+    )
+
+    const unsubscribe = onSnapshot(matchesQuery, (snapshot) => {
+      const matchesList: GroupMatch[] = []
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        matchesList.push({
+          id: doc.id,
+          groupId: data.groupId,
+          teamA: data.teamA,
+          teamB: data.teamB,
+          teamANames: data.teamANames,
+          teamBNames: data.teamBNames,
+          winningTeam: data.winningTeam,
+          date: data.date.toDate(),
+          createdAt: data.createdAt.toDate(),
+          createdBy: data.createdBy,
+          pointsAwarded: data.pointsAwarded,
+          allPlayerIds: data.allPlayerIds,
+        })
+      })
+      setMatches(matchesList)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [groupId])
+
+  // Load user's preferred view for this group
+  useEffect(() => {
+    if (!user || !groupId) return
+
+    const loadPreference = async () => {
+      const preferenceId = `${user.uid}_${groupId}`
+      const preferenceDoc = await getDoc(
+        doc(db, 'userGroupPreferences', preferenceId)
+      )
+      if (preferenceDoc.exists()) {
+        setCurrentView(preferenceDoc.data().preferredView)
+      }
+    }
+
+    loadPreference()
+  }, [user, groupId])
+
+  // Save user's preferred view when it changes
+  const handleViewChange = async (view: PeriodView) => {
+    setCurrentView(view)
+    if (!user || !groupId) return
+
+    const preferenceId = `${user.uid}_${groupId}`
+    await setDoc(doc(db, 'userGroupPreferences', preferenceId), {
+      userId: user.uid,
+      groupId,
+      preferredView: view,
+      lastUpdated: Timestamp.now(),
+    })
+  }
+
+  // Calculate rankings for the current period
+  const getRankings = (): GroupRanking[] => {
+    const memberNames = new Map<string, string>()
+    members.forEach((m) => memberNames.set(m.userId, m.userName))
+
+    let startDate: Date | undefined
+    switch (currentView) {
+      case 'day':
+        startDate = getStartOfDay(new Date())
+        break
+      case 'week':
+        startDate = getStartOfWeek(new Date())
+        break
+      case 'month':
+        startDate = getStartOfMonth(new Date())
+        break
+      case 'year':
+        startDate = getStartOfYear(new Date())
+        break
+    }
+
+    const memberIds = members.map((m) => m.userId)
+    return calculateGroupRankings(matches, memberIds, memberNames, startDate)
+  }
+
+  const rankings = getRankings()
+
+  const handleDeleteMatch = async (matchId: string) => {
+    try {
+      await deleteDoc(doc(db, 'groupMatches', matchId))
+      setDeleteMatchId(null)
+    } catch (error) {
+      console.error('Error deleting match:', error)
+      alert('Errore durante la cancellazione della partita.')
+    }
+  }
+
+  const getPeriodLabel = () => {
+    switch (currentView) {
+      case 'day':
+        return 'Oggi'
+      case 'week':
+        return 'Questa Settimana'
+      case 'month':
+        return 'Questo Mese'
+      case 'year':
+        return 'Quest\'Anno'
+    }
+  }
+
+  if (loading || !group) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Caricamento...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-lg mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/groups')}
+            className="h-10 w-10"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-6 w-6" />
+            {group.name}
+          </h1>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setInfoDialogOpen(true)}
+            className="h-10 w-10"
+          >
+            <Info className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <Dialog open={addMatchOpen} onOpenChange={setAddMatchOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full" size="lg">
+                <Plus className="mr-2 h-5 w-5" />
+                Registra Partita
+              </Button>
+            </DialogTrigger>
+            <RecordMatchDialog
+              groupId={groupId!}
+              members={members}
+              onClose={() => setAddMatchOpen(false)}
+            />
+          </Dialog>
+
+          <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary" className="w-full" size="lg">
+                <UserPlus className="mr-2 h-5 w-5" />
+                Aggiungi Membro
+              </Button>
+            </DialogTrigger>
+            <AddMemberDialog
+              groupId={groupId!}
+              currentMembers={members}
+            />
+          </Dialog>
+        </div>
+
+        {/* Rankings Tabs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5" />
+              Classifica - {getPeriodLabel()}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={currentView} onValueChange={(v) => handleViewChange(v as PeriodView)}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="day">Giorno</TabsTrigger>
+                <TabsTrigger value="week">Settimana</TabsTrigger>
+                <TabsTrigger value="month">Mese</TabsTrigger>
+                <TabsTrigger value="year">Anno</TabsTrigger>
+              </TabsList>
+              <TabsContent value={currentView} className="mt-4">
+                {rankings.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    Nessuna partita in questo periodo
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {rankings.map((ranking, index) => (
+                      <div
+                        key={ranking.userId}
+                        className="flex items-center justify-between p-3 rounded-lg border-2 border-foreground bg-card"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-foreground text-background font-bold">
+                            {index === 0 && <Medal className="h-5 w-5 text-accent" />}
+                            {index !== 0 && <span>{index + 1}</span>}
+                          </div>
+                          <div>
+                            <p className="font-semibold">{ranking.userName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ranking.matchesWon}/{ranking.matchesPlayed} partite vinte
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-primary">
+                            {ranking.points}
+                          </p>
+                          <p className="text-xs text-muted-foreground">punti</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Members List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Membri ({members.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-2 rounded border border-foreground"
+                >
+                  <span className="font-medium">{member.userName}</span>
+                  {member.userId === group.createdBy && (
+                    <span className="text-xs bg-accent text-foreground px-2 py-1 rounded font-semibold">
+                      Admin
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Match History */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Storico Partite
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {matches.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                Nessuna partita registrata
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {matches.map((match) => (
+                  <div
+                    key={match.id}
+                    className="p-3 rounded-lg border-2 border-foreground bg-card"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(match.date)}
+                      </p>
+                      {match.createdBy === user?.uid && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() => setDeleteMatchId(match.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div
+                        className={`p-2 rounded border-2 ${
+                          match.winningTeam === 'A'
+                            ? 'border-success bg-success/10'
+                            : 'border-foreground'
+                        }`}
+                      >
+                        <p className="text-xs font-semibold mb-1">Squadra A</p>
+                        <p className="text-sm">{match.teamANames.join(', ')}</p>
+                      </div>
+                      <div
+                        className={`p-2 rounded border-2 ${
+                          match.winningTeam === 'B'
+                            ? 'border-success bg-success/10'
+                            : 'border-foreground'
+                        }`}
+                      >
+                        <p className="text-xs font-semibold mb-1">Squadra B</p>
+                        <p className="text-sm">{match.teamBNames.join(', ')}</p>
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        +{match.pointsAwarded} punti per i vincitori
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delete Match Confirmation */}
+        <AlertDialog
+          open={deleteMatchId !== null}
+          onOpenChange={() => setDeleteMatchId(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminare questa partita?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Questa azione non può essere annullata. La partita verrà eliminata
+                definitivamente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMatchId && handleDeleteMatch(deleteMatchId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Elimina
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Info Dialog */}
+        <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Sistema Punti</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 text-sm">
+              <p className="text-muted-foreground">
+                I punti guadagnati in una partita equivalgono al numero di avversari
+                sconfitti dalla tua squadra.
+              </p>
+              <div className="space-y-2">
+                <p className="font-semibold">Esempi:</p>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  <li>Partita 3v3: vincitori guadagnano 3 punti ciascuno</li>
+                  <li>Partita 4v2 vinta dai 4: vincitori guadagnano 2 punti</li>
+                  <li>Partita 4v2 vinta dai 2: vincitori guadagnano 4 punti</li>
+                  <li>Partita 1v1: vincitore guadagna 1 punto</li>
+                  <li>Partita 5v1 vinta dall'1: guadagna 5 punti</li>
+                </ul>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  )
+}
+
+// Record Match Dialog Component
+function RecordMatchDialog({
+  groupId,
+  members,
+  onClose,
+}: {
+  groupId: string
+  members: GroupMember[]
+  onClose: () => void
+}) {
+  const { user } = useAuth()
+  const [matchDate, setMatchDate] = useState(new Date().toISOString().split('T')[0])
+  const [teamA, setTeamA] = useState<string[]>([])
+  const [teamB, setTeamB] = useState<string[]>([])
+  const [winningTeam, setWinningTeam] = useState<'A' | 'B' | ''>('')
+  const [saving, setSaving] = useState(false)
+
+  const togglePlayerTeamA = (userId: string) => {
+    if (teamA.includes(userId)) {
+      setTeamA(teamA.filter((id) => id !== userId))
+    } else {
+      setTeamA([...teamA, userId])
+      setTeamB(teamB.filter((id) => id !== userId))
+    }
+  }
+
+  const togglePlayerTeamB = (userId: string) => {
+    if (teamB.includes(userId)) {
+      setTeamB(teamB.filter((id) => id !== userId))
+    } else {
+      setTeamB([...teamB, userId])
+      setTeamA(teamA.filter((id) => id !== userId))
+    }
+  }
+
+  const canSave =
+    teamA.length >= 1 &&
+    teamB.length >= 1 &&
+    teamA.length + teamB.length <= members.length &&
+    winningTeam !== ''
+
+  const handleSave = async () => {
+    if (!user || !canSave) return
+
+    setSaving(true)
+    try {
+      const teamANames = teamA.map(
+        (id) => members.find((m) => m.userId === id)?.userName || ''
+      )
+      const teamBNames = teamB.map(
+        (id) => members.find((m) => m.userId === id)?.userName || ''
+      )
+
+      const pointsAwarded = calculateMatchPoints(teamA.length, teamB.length, winningTeam)
+
+      await addDoc(collection(db, 'groupMatches'), {
+        groupId,
+        teamA,
+        teamB,
+        teamANames,
+        teamBNames,
+        winningTeam,
+        date: Timestamp.fromDate(new Date(matchDate)),
+        createdAt: Timestamp.now(),
+        createdBy: user.uid,
+        pointsAwarded,
+        allPlayerIds: [...teamA, ...teamB],
+      })
+
+      onClose()
+    } catch (error) {
+      console.error('Error saving match:', error)
+      alert('Errore durante il salvataggio della partita.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Registra Partita</DialogTitle>
+        <DialogDescription>
+          Seleziona i membri per ogni squadra e il vincitore
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        {/* Date */}
+        <div>
+          <label className="text-sm font-semibold mb-2 block">Data Partita</label>
+          <Input
+            type="date"
+            value={matchDate}
+            onChange={(e) => setMatchDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+          />
+        </div>
+
+        {/* Team A */}
+        <div>
+          <label className="text-sm font-semibold mb-2 block">
+            Squadra A ({teamA.length})
+          </label>
+          <div className="space-y-2">
+            {members.map((member) => (
+              <Button
+                key={member.id}
+                variant={teamA.includes(member.userId) ? 'default' : 'outline'}
+                className="w-full justify-start"
+                onClick={() => togglePlayerTeamA(member.userId)}
+              >
+                {member.userName}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Team B */}
+        <div>
+          <label className="text-sm font-semibold mb-2 block">
+            Squadra B ({teamB.length})
+          </label>
+          <div className="space-y-2">
+            {members.map((member) => (
+              <Button
+                key={member.id}
+                variant={teamB.includes(member.userId) ? 'default' : 'outline'}
+                className="w-full justify-start"
+                onClick={() => togglePlayerTeamB(member.userId)}
+              >
+                {member.userName}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Winner */}
+        {teamA.length > 0 && teamB.length > 0 && (
+          <div>
+            <label className="text-sm font-semibold mb-2 block">Vincitore</label>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={winningTeam === 'A' ? 'default' : 'outline'}
+                onClick={() => setWinningTeam('A')}
+              >
+                Squadra A
+              </Button>
+              <Button
+                variant={winningTeam === 'B' ? 'default' : 'outline'}
+                onClick={() => setWinningTeam('B')}
+              >
+                Squadra B
+              </Button>
+            </div>
+            {winningTeam && (
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                +{calculateMatchPoints(teamA.length, teamB.length, winningTeam)} punti
+                per i vincitori
+              </p>
+            )}
+          </div>
+        )}
+
+        <Button onClick={handleSave} disabled={!canSave || saving} className="w-full">
+          {saving ? 'Salvataggio...' : 'Salva Partita'}
+        </Button>
+      </div>
+    </DialogContent>
+  )
+}
+
+// Add Member Dialog Component
+function AddMemberDialog({
+  groupId,
+  currentMembers,
+}: {
+  groupId: string
+  currentMembers: GroupMember[]
+}) {
+  const { user } = useAuth()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ id: string; displayName: string }[]>([])
+  const [searching, setSearching] = useState(false)
+  const [adding, setAdding] = useState<string | null>(null)
+
+  const currentMemberIds = currentMembers.map((m) => m.userId)
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      const usersRef = collection(db, 'users')
+      const q = query(
+        usersRef,
+        where('displayNameLower', '>=', searchQuery.toLowerCase()),
+        where('displayNameLower', '<=', searchQuery.toLowerCase() + '\uf8ff')
+      )
+
+      const snapshot = await getDocs(q)
+      const results: { id: string; displayName: string }[] = []
+      snapshot.forEach((doc) => {
+        if (!currentMemberIds.includes(doc.id)) {
+          results.push({
+            id: doc.id,
+            displayName: doc.data().displayName,
+          })
+        }
+      })
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Error searching users:', error)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleAddMember = async (userId: string, userName: string) => {
+    if (!user) return
+
+    setAdding(userId)
+    try {
+      // Add to groupMembers collection
+      await addDoc(collection(db, 'groupMembers'), {
+        groupId,
+        userId,
+        userName,
+        joinedAt: Timestamp.now(),
+      })
+
+      // Update group's memberIds array
+      await updateDoc(doc(db, 'groups', groupId), {
+        memberIds: arrayUnion(userId),
+      })
+
+      setSearchQuery('')
+      setSearchResults([])
+    } catch (error) {
+      console.error('Error adding member:', error)
+      alert('Errore durante l\'aggiunta del membro.')
+    } finally {
+      setAdding(null)
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Aggiungi Membro</DialogTitle>
+        <DialogDescription>
+          Cerca un utente per aggiungerlo al gruppo
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Cerca per nome utente..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSearch()
+              }
+            }}
+          />
+          <Button onClick={handleSearch} disabled={searching}>
+            {searching ? 'Cerca...' : 'Cerca'}
+          </Button>
+        </div>
+
+        {searchResults.length > 0 && (
+          <div className="space-y-2">
+            {searchResults.map((result) => (
+              <div
+                key={result.id}
+                className="flex items-center justify-between p-2 rounded border border-foreground"
+              >
+                <span className="font-medium">{result.displayName}</span>
+                <Button
+                  size="sm"
+                  onClick={() => handleAddMember(result.id, result.displayName)}
+                  disabled={adding === result.id}
+                >
+                  {adding === result.id ? 'Aggiunta...' : 'Aggiungi'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {searchQuery && searchResults.length === 0 && !searching && (
+          <p className="text-center text-muted-foreground text-sm">
+            Nessun utente trovato
+          </p>
+        )}
+      </div>
+    </DialogContent>
+  )
+}

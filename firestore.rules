@@ -53,5 +53,59 @@ service cloud.firestore {
       allow delete: if request.auth != null &&
         resource.data.createdBy == request.auth.uid;
     }
+
+    // Groups collection
+    match /groups/{groupId} {
+      // Members can read the group
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.memberIds;
+      // Authenticated users can create groups (they become the creator)
+      allow create: if request.auth != null &&
+        request.resource.data.createdBy == request.auth.uid;
+      // Only creator or members can update (for adding/removing members)
+      allow update: if request.auth != null &&
+        (resource.data.createdBy == request.auth.uid ||
+         request.auth.uid in resource.data.memberIds);
+      // Only the creator can delete
+      allow delete: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+    }
+
+    // Group members collection
+    match /groupMembers/{membershipId} {
+      // Members of the group can read all memberships
+      allow read: if request.auth != null;
+      // Group creator or the user themselves can create membership
+      allow create: if request.auth != null;
+      // Only the user or group creator can delete their membership
+      allow delete: if request.auth != null &&
+        (resource.data.userId == request.auth.uid);
+    }
+
+    // Group matches collection
+    match /groupMatches/{matchId} {
+      // Players in the match can read it
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.allPlayerIds;
+      // Authenticated users can create matches where they are a player
+      allow create: if request.auth != null &&
+        request.auth.uid in request.resource.data.allPlayerIds;
+      // Only the creator can delete
+      allow delete: if request.auth != null &&
+        resource.data.createdBy == request.auth.uid;
+    }
+
+    // User group preferences collection
+    match /userGroupPreferences/{preferenceId} {
+      // Users can only read their own preferences
+      allow read: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+      // Users can only create/update their own preferences
+      allow create, update: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+      // Users can delete their own preferences
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
   }
 }
