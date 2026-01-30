@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,10 +27,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Users, Plus, ArrowLeft, Info } from 'lucide-react'
 import type { Group } from '@/lib/types'
+import MobileBottomNav from '@/components/MobileBottomNav'
 
 export default function GroupsPage() {
   const { user, userData } = useAuth()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [groups, setGroups] = useState<Group[]>([])
   const [groupMembers, setGroupMembers] = useState<Map<string, number>>(new Map())
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -118,14 +121,14 @@ export default function GroupsPage() {
       setCreateDialogOpen(false)
     } catch (error) {
       console.error('Error creating group:', error)
-      alert('Errore nella creazione del gruppo. Riprova.')
+      alert(t('groups.createError'))
     } finally {
       setCreating(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-4 pb-24 md:pb-4">
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -137,7 +140,7 @@ export default function GroupsPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">Gruppi</h1>
+          <h1 className="text-2xl font-bold">{t('groups.title')}</h1>
           <Button
             variant="outline"
             size="icon"
@@ -153,19 +156,19 @@ export default function GroupsPage() {
           <DialogTrigger asChild>
             <Button className="w-full" size="lg">
               <Plus className="mr-2 h-5 w-5" />
-              Crea Gruppo
+              {t('groups.createGroup')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Crea un Nuovo Gruppo</DialogTitle>
+              <DialogTitle>{t('groups.createGroupTitle')}</DialogTitle>
               <DialogDescription>
-                Scegli un nome per il tuo gruppo. Potrai aggiungere membri in seguito.
+                {t('groups.createGroupDescription')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <Input
-                placeholder="Nome del gruppo..."
+                placeholder={t('groups.groupNamePlaceholder')}
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 onKeyDown={(e) => {
@@ -180,7 +183,7 @@ export default function GroupsPage() {
                 disabled={!groupName.trim() || creating}
                 className="w-full"
               >
-                {creating ? 'Creazione...' : 'Crea Gruppo'}
+                {creating ? t('groups.creating') : t('groups.createGroup')}
               </Button>
             </div>
           </DialogContent>
@@ -192,10 +195,10 @@ export default function GroupsPage() {
             <CardContent className="p-8 text-center">
               <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-muted-foreground">
-                Non fai ancora parte di nessun gruppo.
+                {t('groups.noGroupsTitle')}
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Crea un gruppo per iniziare a giocare con i tuoi amici!
+                {t('groups.noGroupsDescription')}
               </p>
             </CardContent>
           </Card>
@@ -214,7 +217,9 @@ export default function GroupsPage() {
                       <span>{group.name}</span>
                     </div>
                     <span className="text-sm font-normal text-muted-foreground">
-                      {groupMembers.get(group.id) || 0} membri
+                      {t('common.members', {
+                        count: groupMembers.get(group.id) || 0,
+                      })}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -227,39 +232,38 @@ export default function GroupsPage() {
         <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Come Funzionano i Gruppi</DialogTitle>
+              <DialogTitle>{t('groups.infoTitle')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 text-sm">
               <div>
-                <h4 className="font-semibold mb-2">Partite a Squadre</h4>
+                <h4 className="font-semibold mb-2">{t('groups.infoTeamsTitle')}</h4>
                 <p className="text-muted-foreground">
-                  Nei gruppi puoi registrare partite con squadre da 1 a N-1 giocatori.
-                  Scegli i membri di ogni squadra e registra il vincitore.
+                  {t('groups.infoTeamsDescription')}
                 </p>
               </div>
               <div>
-                <h4 className="font-semibold mb-2">Sistema Punti</h4>
+                <h4 className="font-semibold mb-2">{t('groups.infoPointsTitle')}</h4>
                 <p className="text-muted-foreground">
-                  I punti guadagnati equivalgono al numero di avversari sconfitti.
+                  {t('groups.infoPointsDescription')}
                 </p>
                 <ul className="list-disc list-inside mt-2 text-muted-foreground space-y-1">
-                  <li>3v3 vinta: ogni vincitore guadagna 3 punti</li>
-                  <li>4v2 vinta dai 4: ogni vincitore guadagna 2 punti</li>
-                  <li>4v2 vinta dai 2: ogni vincitore guadagna 4 punti</li>
-                  <li>1v1 vinta: il vincitore guadagna 1 punto</li>
+                  <li>{t('groups.infoPointsExample1')}</li>
+                  <li>{t('groups.infoPointsExample2')}</li>
+                  <li>{t('groups.infoPointsExample3')}</li>
+                  <li>{t('groups.infoPointsExample4')}</li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-semibold mb-2">Classifiche</h4>
+                <h4 className="font-semibold mb-2">{t('groups.infoRankingsTitle')}</h4>
                 <p className="text-muted-foreground">
-                  Ogni gruppo ha classifiche per giorno, settimana, mese e anno.
-                  L'app ricorda la tua vista preferita per ogni gruppo.
+                  {t('groups.infoRankingsDescription')}
                 </p>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       </div>
+      <MobileBottomNav />
     </div>
   )
 }

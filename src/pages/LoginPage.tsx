@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, UserPlus } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -21,6 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { signInWithGoogle, setUsername, needsUsername, user } = useAuth()
+  const { t } = useI18n()
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
@@ -29,7 +32,7 @@ export default function LoginPage() {
     const result = await signInWithGoogle()
 
     if (!result.success) {
-      setError(result.error || 'Failed to sign in')
+      setError(result.error || t('login.signInError'))
     }
 
     setLoading(false)
@@ -39,17 +42,17 @@ export default function LoginPage() {
     e.preventDefault()
 
     if (displayName.trim().length < 3) {
-      setError('Username must be at least 3 characters')
+      setError(t('login.usernameTooShort'))
       return
     }
 
     if (displayName.trim().length > 20) {
-      setError('Username cannot exceed 20 characters')
+      setError(t('login.usernameTooLong'))
       return
     }
 
     if (!/^[a-zA-Z0-9_]+$/.test(displayName.trim())) {
-      setError('Username can only contain letters, numbers and underscores')
+      setError(t('login.usernameInvalid'))
       return
     }
 
@@ -59,7 +62,7 @@ export default function LoginPage() {
     const result = await setUsername(displayName)
 
     if (!result.success) {
-      setError(result.error || 'Failed to set username')
+      setError(result.error || t('login.usernameSaveError'))
     }
 
     setLoading(false)
@@ -74,21 +77,23 @@ export default function LoginPage() {
             <div className="mx-auto mb-4 w-20 h-20 bg-secondary border-3 border-foreground shadow-brutal flex items-center justify-center">
               <UserPlus className="w-10 h-10" />
             </div>
-            <CardTitle className="text-2xl font-bold">Choose your username</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              {t('login.chooseUsernameTitle')}
+            </CardTitle>
             <CardDescription className="text-base">
-              This will be visible to your friends
+              {t('login.chooseUsernameDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSetUsername} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="displayName" className="font-semibold">
-                  Username
+                  {t('login.usernameLabel')}
                 </label>
                 <Input
                   id="displayName"
                   type="text"
-                  placeholder="e.g. john_doe"
+                  placeholder={t('login.usernamePlaceholder')}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   disabled={loading}
@@ -96,7 +101,7 @@ export default function LoginPage() {
                   autoCapitalize="off"
                 />
                 <p className="text-sm text-gray-600">
-                  3-20 characters, letters, numbers and underscores only
+                  {t('login.usernameHint')}
                 </p>
               </div>
 
@@ -114,13 +119,16 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t('common.saving')}
                   </>
                 ) : (
-                  'Continue'
+                  t('common.continue')
                 )}
               </Button>
             </form>
+            <div className="mt-4 flex justify-center">
+              <LanguageSwitcher />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -135,9 +143,9 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 w-20 h-20 bg-primary border-3 border-foreground shadow-brutal flex items-center justify-center">
             <span className="text-4xl font-bold">8</span>
           </div>
-          <CardTitle className="text-3xl font-bold">CUE SCORE</CardTitle>
+          <CardTitle className="text-3xl font-bold">{t('login.title')}</CardTitle>
           <CardDescription className="text-base">
-            Track match scores with your friends
+            {t('login.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -156,15 +164,18 @@ export default function LoginPage() {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
+                {t('login.signingIn')}
               </>
             ) : (
               <>
                 <GoogleIcon className="mr-2 h-5 w-5" />
-                Sign in with Google
+                {t('login.signInWithGoogle')}
               </>
             )}
           </Button>
+          <div className="flex justify-center">
+            <LanguageSwitcher />
+          </div>
         </CardContent>
       </Card>
     </div>

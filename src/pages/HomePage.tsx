@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,6 +36,8 @@ import {
   Bell,
   LogOut
 } from 'lucide-react'
+import MobileBottomNav from '@/components/MobileBottomNav'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 interface Friend {
   odid: string
@@ -59,6 +62,7 @@ interface SearchResult {
 export default function HomePage() {
   const { user, userData, signOut } = useAuth()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
@@ -246,7 +250,7 @@ export default function HomePage() {
     console.log('acceptFriendRequest called', { request, user: user?.uid, userData })
     if (!user || !userData) {
       console.error('No user or userData')
-      alert('Error: No user data')
+      alert(t('home.noUserDataError'))
       return
     }
     if (processingRequestId) {
@@ -261,14 +265,14 @@ export default function HomePage() {
       const requestSnapshot = await getDoc(requestRef)
       if (!requestSnapshot.exists()) {
         console.error('Request does not exist')
-        alert('Error: Request no longer exists')
+        alert(t('home.requestMissingError'))
         return
       }
       const requestData = requestSnapshot.data()
       console.log('Request data:', requestData)
       if (requestData.status !== 'pending') {
         console.error('Request is not pending:', requestData.status)
-        alert('Error: Request is not pending')
+        alert(t('home.requestNotPendingError'))
         return
       }
 
@@ -321,10 +325,14 @@ export default function HomePage() {
       batch.delete(requestRef)
       await batch.commit()
       console.log('SUCCESS: Friend request accepted!')
-      alert('Friend request accepted!')
+      alert(t('home.acceptSuccess'))
     } catch (error) {
       console.error('Error accepting friend request:', error)
-      alert('Error accepting friend request: ' + (error instanceof Error ? error.message : String(error)))
+      alert(
+        t('home.acceptError', {
+          message: error instanceof Error ? error.message : String(error)
+        })
+      )
     } finally {
       setProcessingRequestId(null)
     }
@@ -342,10 +350,14 @@ export default function HomePage() {
       console.log('Deleting friend request')
       await deleteDoc(doc(db, 'friendRequests', request.id))
       console.log('SUCCESS: Friend request rejected!')
-      alert('Friend request rejected!')
+      alert(t('home.rejectSuccess'))
     } catch (error) {
       console.error('Error rejecting friend request:', error)
-      alert('Error rejecting friend request: ' + (error instanceof Error ? error.message : String(error)))
+      alert(
+        t('home.rejectError', {
+          message: error instanceof Error ? error.message : String(error)
+        })
+      )
     } finally {
       setProcessingRequestId(null)
     }
@@ -372,20 +384,23 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold">CUE SCORE</h1>
             <p className="text-sm font-medium">@{userData?.displayName}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button variant="ghost" size="icon" onClick={handleLogout} aria-label={t('common.signOut')}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4 space-y-4">
+      <main className="max-w-lg mx-auto p-4 pb-24 md:pb-4 space-y-4">
         {/* Pending Requests */}
         {pendingRequests.length > 0 && (
           <Card className="bg-accent">
             <CardHeader className="py-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Bell className="h-5 w-5" />
-                Friend Requests ({pendingRequests.length})
+                {t('home.friendRequests', { count: pendingRequests.length })}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -433,20 +448,20 @@ export default function HomePage() {
             <DialogTrigger asChild>
               <Button className="w-full" variant="secondary">
                 <UserPlus className="mr-2 h-5 w-5" />
-                Add Friend
+                {t('home.addFriend')}
               </Button>
             </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Search Friend</DialogTitle>
+              <DialogTitle>{t('home.searchFriendTitle')}</DialogTitle>
               <DialogDescription>
-                Search by username or email to send a friend request
+                {t('home.searchFriendDescription')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Username or email..."
+                  placeholder={t('home.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && searchUsers()}
@@ -474,9 +489,13 @@ export default function HomePage() {
                         )}
                       </div>
                       {isAlreadyFriend(result.id) ? (
-                        <span className="text-sm text-success font-medium">Friend</span>
+                        <span className="text-sm text-success font-medium">
+                          {t('home.friendLabel')}
+                        </span>
                       ) : hasSentRequest(result.id) ? (
-                        <span className="text-sm text-gray-500">Request sent</span>
+                        <span className="text-sm text-gray-500">
+                          {t('home.requestSent')}
+                        </span>
                       ) : (
                         <Button
                           size="sm"
@@ -497,20 +516,12 @@ export default function HomePage() {
 
               {searchResults.length === 0 && searchQuery && !searching && (
                 <p className="text-center text-gray-500 py-4">
-                  No users found
+                  {t('home.noUsersFound')}
                 </p>
               )}
             </div>
           </DialogContent>
         </Dialog>
-
-          <Button
-            className="w-full"
-            onClick={() => navigate('/groups')}
-          >
-            <Users className="mr-2 h-5 w-5" />
-            Gruppi
-          </Button>
         </div>
 
         {/* Friends List */}
@@ -518,13 +529,13 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Your Friends ({friends.length})
+              {t('home.friendsTitle', { count: friends.length })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {friends.length === 0 ? (
               <p className="text-center text-gray-500 py-8">
-                No friends yet. Search for someone to get started!
+                {t('home.noFriends')}
               </p>
             ) : (
               <div className="space-y-2">
@@ -548,6 +559,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
       </main>
+      <MobileBottomNav />
     </div>
   )
 }
