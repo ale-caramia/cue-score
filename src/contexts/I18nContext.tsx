@@ -9,6 +9,12 @@ type TranslationDictionary = {
 
 type InterpolationValues = Record<string, string | number>
 
+type I18nContextValue = {
+  language: Language
+  setLanguage: (language: Language) => void
+  t: (key: string, values?: InterpolationValues) => string
+}
+
 const translations: Record<Language, TranslationDictionary> = {
   en: {
     common: {
@@ -375,8 +381,8 @@ const translations: Record<Language, TranslationDictionary> = {
   },
 }
 
-const I18nContext = createContext({
-  language: 'en' as Language,
+const I18nContext = createContext<I18nContextValue>({
+  language: 'en',
   setLanguage: (_language: Language) => {},
   t: (_key: string, _values?: InterpolationValues) => '',
 })
