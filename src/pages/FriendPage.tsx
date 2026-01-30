@@ -267,26 +267,26 @@ export default function FriendPage() {
                   <button
                     type="button"
                     onClick={() => setWinner('me')}
-                    className={`p-4 border-3 border-foreground font-semibold transition-all ${
+                    className={`p-4 border-3 border-foreground font-semibold transition-all overflow-hidden ${
                       winner === 'me'
                         ? 'bg-success text-white shadow-brutal-sm'
                         : 'bg-white hover:bg-gray-50'
                     }`}
                   >
                     <Trophy className="h-6 w-6 mx-auto mb-2" />
-                    {userData?.displayName}
+                    <span className="block truncate">{userData?.displayName}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setWinner('friend')}
-                    className={`p-4 border-3 border-foreground font-semibold transition-all ${
+                    className={`p-4 border-3 border-foreground font-semibold transition-all overflow-hidden ${
                       winner === 'friend'
                         ? 'bg-success text-white shadow-brutal-sm'
                         : 'bg-white hover:bg-gray-50'
                     }`}
                   >
                     <Trophy className="h-6 w-6 mx-auto mb-2" />
-                    {friendName}
+                    <span className="block truncate">{friendName}</span>
                   </button>
                 </div>
               </div>
