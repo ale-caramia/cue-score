@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import LoginPage from '@/pages/LoginPage'
 import HomePage from '@/pages/HomePage'
 import FriendPage from '@/pages/FriendPage'
+import GroupsPage from '@/pages/GroupsPage'
+import GroupPage from '@/pages/GroupPage'
 import { Loader2 } from 'lucide-react'
 
 function LoadingScreen() {
@@ -33,6 +35,8 @@ function ProtectedRoutes() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/friend/:friendId" element={<FriendPage />} />
+      <Route path="/groups" element={<GroupsPage />} />
+      <Route path="/groups/:groupId" element={<GroupPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

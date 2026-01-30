@@ -427,14 +427,15 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* Add Friend */}
-        <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full" variant="secondary">
-              <UserPlus className="mr-2 h-5 w-5" />
-              Add Friend
-            </Button>
-          </DialogTrigger>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full" variant="secondary">
+                <UserPlus className="mr-2 h-5 w-5" />
+                Add Friend
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Search Friend</DialogTitle>
@@ -502,6 +503,15 @@ export default function HomePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+          <Button
+            className="w-full"
+            onClick={() => navigate('/groups')}
+          >
+            <Users className="mr-2 h-5 w-5" />
+            Gruppi
+          </Button>
+        </div>
 
         {/* Friends List */}
         <Card>
