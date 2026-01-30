@@ -16,7 +16,8 @@ import {
   collection,
   query,
   where,
-  getDocs,
+  getDoc,
+  doc,
   addDoc,
   onSnapshot,
   Timestamp,
@@ -60,14 +61,13 @@ export default function GroupsPage() {
 
       // Fetch group details for each groupId
       const groupPromises = groupIds.map(async (groupId) => {
-        const groupDoc = await getDocs(
-          query(collection(db, 'groups'), where('__name__', '==', groupId))
-        )
-        if (!groupDoc.empty) {
-          const doc = groupDoc.docs[0]
-          const data = doc.data()
+        const groupDocRef = doc(db, 'groups', groupId)
+        const groupDocSnap = await getDoc(groupDocRef)
+
+        if (groupDocSnap.exists()) {
+          const data = groupDocSnap.data()
           return {
-            id: doc.id,
+            id: groupDocSnap.id,
             name: data.name,
             createdBy: data.createdBy,
             createdAt: data.createdAt.toDate(),
