@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -70,6 +71,7 @@ export default function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { t } = useI18n()
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [matches, setMatches] = useState<GroupMatch[]>([])
@@ -229,14 +231,14 @@ export default function GroupPage() {
       setDeleteMatchId(null)
     } catch (error) {
       console.error('Error deleting match:', error)
-      alert('Errore durante la cancellazione della partita.')
+      alert(t('group.deleteMatchError'))
     }
   }
 
   const handleDeleteGroup = async () => {
     if (!user || !groupId || !group) return
     if (group.createdBy !== user.uid) {
-      alert('Solo l\'admin può eliminare il gruppo.')
+      alert(t('group.deleteGroupUnauthorized'))
       return
     }
 
@@ -280,7 +282,7 @@ export default function GroupPage() {
       navigate('/groups')
     } catch (error) {
       console.error('Error deleting group:', error)
-      alert('Errore durante l\'eliminazione del gruppo.')
+      alert(t('group.deleteGroupError'))
     } finally {
       setDeletingGroup(false)
       setDeleteGroupOpen(false)
@@ -290,20 +292,20 @@ export default function GroupPage() {
   const getPeriodLabel = () => {
     switch (currentView) {
       case 'day':
-        return 'Oggi'
+        return t('friend.today')
       case 'week':
-        return 'Questa Settimana'
+        return t('friend.thisWeek')
       case 'month':
-        return 'Questo Mese'
+        return t('friend.thisMonth')
       case 'year':
-        return 'Quest\'Anno'
+        return t('friend.thisYear')
     }
   }
 
   if (loading || !group) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>Caricamento...</p>
+        <p>{t('common.loading')}</p>
       </div>
     )
   }
@@ -353,7 +355,7 @@ export default function GroupPage() {
             <DialogTrigger asChild>
               <Button className="w-full" size="lg">
                 <Plus className="mr-2 h-5 w-5" />
-                Registra Partita
+                {t('group.addMatch')}
               </Button>
             </DialogTrigger>
             <RecordMatchDialog
@@ -367,7 +369,7 @@ export default function GroupPage() {
             <DialogTrigger asChild>
               <Button variant="secondary" className="w-full" size="lg">
                 <UserPlus className="mr-2 h-5 w-5" />
-                Aggiungi Membro
+                {t('group.addMember')}
               </Button>
             </DialogTrigger>
             <AddMemberDialog
@@ -382,21 +384,21 @@ export default function GroupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5" />
-              Classifica - {getPeriodLabel()}
+              {t('group.rankingsTitle')} - {getPeriodLabel()}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={currentView} onValueChange={(v) => handleViewChange(v as PeriodView)}>
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="day">Giorno</TabsTrigger>
-                <TabsTrigger value="week">Settimana</TabsTrigger>
-                <TabsTrigger value="month">Mese</TabsTrigger>
-                <TabsTrigger value="year">Anno</TabsTrigger>
+                <TabsTrigger value="day">{t('group.day')}</TabsTrigger>
+                <TabsTrigger value="week">{t('group.week')}</TabsTrigger>
+                <TabsTrigger value="month">{t('group.month')}</TabsTrigger>
+                <TabsTrigger value="year">{t('group.year')}</TabsTrigger>
               </TabsList>
               <TabsContent value={currentView} className="mt-4">
                 {rankings.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
-                    Nessuna partita in questo periodo
+                    {t('group.noRankings')}
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -413,7 +415,10 @@ export default function GroupPage() {
                           <div>
                             <p className="font-semibold">{ranking.userName}</p>
                             <p className="text-xs text-muted-foreground">
-                              {ranking.matchesWon}/{ranking.matchesPlayed} partite vinte
+                              {t('group.matchesWon', {
+                                won: ranking.matchesWon,
+                                total: ranking.matchesPlayed,
+                              })}
                             </p>
                           </div>
                         </div>
@@ -421,7 +426,7 @@ export default function GroupPage() {
                           <p className="text-2xl font-bold text-primary">
                             {ranking.points}
                           </p>
-                          <p className="text-xs text-muted-foreground">punti</p>
+                          <p className="text-xs text-muted-foreground">{t('common.points')}</p>
                         </div>
                       </div>
                     ))}
@@ -437,7 +442,7 @@ export default function GroupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Membri ({members.length})
+              {t('group.membersTitle', { count: members.length })}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -450,7 +455,7 @@ export default function GroupPage() {
                   <span className="font-medium">{member.userName}</span>
                   {member.userId === group.createdBy && (
                     <span className="text-xs bg-accent text-foreground px-2 py-1 rounded font-semibold">
-                      Admin
+                      {t('group.adminLabel')}
                     </span>
                   )}
                 </div>
@@ -464,13 +469,13 @@ export default function GroupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Storico Partite
+              {t('group.matchesTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {matches.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">
-                Nessuna partita registrata
+                {t('group.noMatches')}
               </p>
             ) : (
               <div className="space-y-3">
@@ -502,7 +507,7 @@ export default function GroupPage() {
                             : 'border-foreground'
                         }`}
                       >
-                        <p className="text-xs font-semibold mb-1">Squadra A</p>
+                        <p className="text-xs font-semibold mb-1">{t('group.teamA')}</p>
                         <p className="text-sm">{match.teamANames.join(', ')}</p>
                       </div>
                       <div
@@ -512,11 +517,11 @@ export default function GroupPage() {
                             : 'border-foreground'
                         }`}
                       >
-                        <p className="text-xs font-semibold mb-1">Squadra B</p>
+                        <p className="text-xs font-semibold mb-1">{t('group.teamB')}</p>
                         <p className="text-sm">{match.teamBNames.join(', ')}</p>
                       </div>
                       <p className="text-xs text-center text-muted-foreground">
-                        +{match.pointsAwarded} punti per i vincitori
+                        {t('group.pointsAwarded', { points: match.pointsAwarded })}
                       </p>
                     </div>
                   </div>
@@ -533,19 +538,18 @@ export default function GroupPage() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Eliminare questa partita?</AlertDialogTitle>
+              <AlertDialogTitle>{t('group.deleteMatchTitle')}</AlertDialogTitle>
               <AlertDialogDescription>
-                Questa azione non può essere annullata. La partita verrà eliminata
-                definitivamente.
+                {t('group.deleteMatchDescription')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Annulla</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteMatchId && handleDeleteMatch(deleteMatchId)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Elimina
+                {t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -555,21 +559,20 @@ export default function GroupPage() {
         <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Sistema Punti</DialogTitle>
+              <DialogTitle>{t('group.infoTitle')}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 text-sm">
               <p className="text-muted-foreground">
-                I punti guadagnati in una partita equivalgono al numero di avversari
-                sconfitti dalla tua squadra.
+                {t('group.infoDescription')}
               </p>
               <div className="space-y-2">
-                <p className="font-semibold">Esempi:</p>
+                <p className="font-semibold">{t('group.exampleTitle')}</p>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                  <li>Partita 3v3: vincitori guadagnano 3 punti ciascuno</li>
-                  <li>Partita 4v2 vinta dai 4: vincitori guadagnano 2 punti</li>
-                  <li>Partita 4v2 vinta dai 2: vincitori guadagnano 4 punti</li>
-                  <li>Partita 1v1: vincitore guadagna 1 punto</li>
-                  <li>Partita 5v1 vinta dall'1: guadagna 5 punti</li>
+                  <li>{t('group.infoExample1')}</li>
+                  <li>{t('group.infoExample2')}</li>
+                  <li>{t('group.infoExample3')}</li>
+                  <li>{t('group.infoExample4')}</li>
+                  <li>{t('group.infoExample5')}</li>
                 </ul>
               </div>
             </div>
@@ -580,27 +583,28 @@ export default function GroupPage() {
         <AlertDialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Eliminare il gruppo "{group.name}"?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t('group.deleteGroupTitle', { name: group.name })}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                Questa azione è irreversibile. Tutti i dati del gruppo verranno
-                eliminati definitivamente:
+                {t('group.deleteGroupDescription')}
                 <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>{members.length} membri</li>
-                  <li>{matches.length} partite</li>
-                  <li>Tutte le statistiche e classifiche</li>
+                  <li>{t('group.deleteGroupMembers', { count: members.length })}</li>
+                  <li>{t('group.deleteGroupMatches', { count: matches.length })}</li>
+                  <li>{t('group.deleteGroupStats')}</li>
                 </ul>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={deletingGroup}>
-                Annulla
+                {t('common.cancel')}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteGroup}
                 disabled={deletingGroup}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {deletingGroup ? 'Eliminazione...' : 'Elimina Definitivamente'}
+                {deletingGroup ? t('group.deletingGroup') : t('group.deleteGroupAction')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -621,6 +625,7 @@ function RecordMatchDialog({
   onClose: () => void
 }) {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [matchDate, setMatchDate] = useState(new Date().toISOString().split('T')[0])
   const [teamA, setTeamA] = useState<string[]>([])
   const [teamB, setTeamB] = useState<string[]>([])
@@ -682,7 +687,7 @@ function RecordMatchDialog({
       onClose()
     } catch (error) {
       console.error('Error saving match:', error)
-      alert('Errore durante il salvataggio della partita.')
+      alert(t('group.saveMatchError'))
     } finally {
       setSaving(false)
     }
@@ -691,15 +696,17 @@ function RecordMatchDialog({
   return (
     <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Registra Partita</DialogTitle>
+        <DialogTitle>{t('group.addMatch')}</DialogTitle>
         <DialogDescription>
-          Seleziona i membri per ogni squadra e il vincitore
+          {t('group.recordMatchDescription')}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         {/* Date */}
         <div>
-          <label className="text-sm font-semibold mb-2 block">Data Partita</label>
+          <label className="text-sm font-semibold mb-2 block">
+            {t('group.matchDateLabel')}
+          </label>
           <Input
             type="date"
             value={matchDate}
@@ -711,7 +718,7 @@ function RecordMatchDialog({
         {/* Team A */}
         <div>
           <label className="text-sm font-semibold mb-2 block">
-            Squadra A ({teamA.length})
+            {t('group.teamA')} ({teamA.length})
           </label>
           <div className="space-y-2">
             {members.map((member) => (
@@ -730,7 +737,7 @@ function RecordMatchDialog({
         {/* Team B */}
         <div>
           <label className="text-sm font-semibold mb-2 block">
-            Squadra B ({teamB.length})
+            {t('group.teamB')} ({teamB.length})
           </label>
           <div className="space-y-2">
             {members.map((member) => (
@@ -749,32 +756,33 @@ function RecordMatchDialog({
         {/* Winner */}
         {teamA.length > 0 && teamB.length > 0 && (
           <div>
-            <label className="text-sm font-semibold mb-2 block">Vincitore</label>
+            <label className="text-sm font-semibold mb-2 block">{t('group.winner')}</label>
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant={winningTeam === 'A' ? 'default' : 'outline'}
                 onClick={() => setWinningTeam('A')}
               >
-                Squadra A
+                {t('group.teamA')}
               </Button>
               <Button
                 variant={winningTeam === 'B' ? 'default' : 'outline'}
                 onClick={() => setWinningTeam('B')}
               >
-                Squadra B
+                {t('group.teamB')}
               </Button>
             </div>
             {winningTeam && (
               <p className="text-xs text-center text-muted-foreground mt-2">
-                +{calculateMatchPoints(teamA.length, teamB.length, winningTeam)} punti
-                per i vincitori
+                {t('group.pointsAwarded', {
+                  points: calculateMatchPoints(teamA.length, teamB.length, winningTeam),
+                })}
               </p>
             )}
           </div>
         )}
 
         <Button onClick={handleSave} disabled={!canSave || saving} className="w-full">
-          {saving ? 'Salvataggio...' : 'Salva Partita'}
+          {saving ? t('common.saving') : t('group.saveMatch')}
         </Button>
       </div>
     </DialogContent>
@@ -790,6 +798,7 @@ function AddMemberDialog({
   currentMembers: GroupMember[]
 }) {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ id: string; displayName: string }[]>([])
   const [searching, setSearching] = useState(false)
@@ -852,7 +861,7 @@ function AddMemberDialog({
       setSearchResults([])
     } catch (error) {
       console.error('Error adding member:', error)
-      alert('Errore durante l\'aggiunta del membro.')
+      alert(t('group.addMemberError'))
     } finally {
       setAdding(null)
     }
@@ -861,15 +870,15 @@ function AddMemberDialog({
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle>Aggiungi Membro</DialogTitle>
+        <DialogTitle>{t('group.addMemberTitle')}</DialogTitle>
         <DialogDescription>
-          Cerca un utente per aggiungerlo al gruppo
+          {t('group.addMemberDescription')}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="flex gap-2">
           <Input
-            placeholder="Cerca per nome utente..."
+            placeholder={t('group.addMemberSearchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -879,7 +888,7 @@ function AddMemberDialog({
             }}
           />
           <Button onClick={handleSearch} disabled={searching}>
-            {searching ? 'Cerca...' : 'Cerca'}
+            {searching ? t('group.searching') : t('common.search')}
           </Button>
         </div>
 
@@ -896,7 +905,7 @@ function AddMemberDialog({
                   onClick={() => handleAddMember(result.id, result.displayName)}
                   disabled={adding === result.id}
                 >
-                  {adding === result.id ? 'Aggiunta...' : 'Aggiungi'}
+                  {adding === result.id ? t('group.addingMember') : t('common.add')}
                 </Button>
               </div>
             ))}
@@ -905,7 +914,7 @@ function AddMemberDialog({
 
         {searchQuery && searchResults.length === 0 && !searching && (
           <p className="text-center text-muted-foreground text-sm">
-            Nessun utente trovato
+            {t('group.addMemberNoResults')}
           </p>
         )}
       </div>

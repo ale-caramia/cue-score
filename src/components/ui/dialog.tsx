@@ -2,6 +2,7 @@ import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/contexts/I18nContext'
 
 const Dialog = DialogPrimitive.Root
 
@@ -41,14 +42,22 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
-        <X className="h-6 w-6" />
-        <span className="sr-only">Chiudi</span>
-      </DialogPrimitive.Close>
+      <DialogCloseButton />
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
+
+const DialogCloseButton = () => {
+  const { t } = useI18n()
+
+  return (
+    <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none">
+      <X className="h-6 w-6" />
+      <span className="sr-only">{t('common.close')}</span>
+    </DialogPrimitive.Close>
+  )
+}
 
 const DialogHeader = ({
   className,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useI18n } from '@/contexts/I18nContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -69,6 +70,7 @@ export default function FriendPage() {
   const { friendId } = useParams<{ friendId: string }>()
   const navigate = useNavigate()
   const { user, userData } = useAuth()
+  const { t } = useI18n()
   const [friendName, setFriendName] = useState('')
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
@@ -190,17 +192,17 @@ export default function FriendPage() {
       <div className="flex items-center justify-between">
         <div className="text-center flex-1">
           <p className="text-2xl font-bold text-success">{stats.wins}</p>
-          <p className="text-xs text-gray-500">Vittorie</p>
+          <p className="text-xs text-gray-500">{t('friend.winsLabel')}</p>
         </div>
         <div className="text-3xl font-bold text-gray-300">-</div>
         <div className="text-center flex-1">
           <p className="text-2xl font-bold text-destructive">{stats.losses}</p>
-          <p className="text-xs text-gray-500">Sconfitte</p>
+          <p className="text-xs text-gray-500">{t('friend.lossesLabel')}</p>
         </div>
       </div>
       {stats.total > 0 && (
         <p className="text-center text-xs text-gray-500 mt-2">
-          {stats.total} partite totali
+          {t('friend.totalMatches', { count: stats.total })}
         </p>
       )}
     </div>
@@ -228,7 +230,9 @@ export default function FriendPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold">{friendName}</h1>
-              <p className="text-sm">vs {userData?.displayName}</p>
+              <p className="text-sm">
+                {t('friend.versus', { name: userData?.displayName ?? '' })}
+              </p>
             </div>
           </div>
         </div>
@@ -240,19 +244,19 @@ export default function FriendPage() {
           <DialogTrigger asChild>
             <Button className="w-full">
               <Plus className="mr-2 h-5 w-5" />
-              Registra Partita
+              {t('friend.addMatch')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nuova Partita</DialogTitle>
+              <DialogTitle>{t('friend.newMatchTitle')}</DialogTitle>
               <DialogDescription>
-                Registra il risultato di una partita con {friendName}
+                {t('friend.newMatchDescription', { name: friendName })}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="font-semibold">Data partita</label>
+                <label className="font-semibold">{t('friend.matchDateLabel')}</label>
                 <Input
                   type="date"
                   value={matchDate}
@@ -262,7 +266,7 @@ export default function FriendPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="font-semibold">Chi ha vinto?</label>
+                <label className="font-semibold">{t('friend.whoWon')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -300,10 +304,10 @@ export default function FriendPage() {
                 {saving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvataggio...
+                    {t('common.saving')}
                   </>
                 ) : (
-                  'Salva Partita'
+                  t('friend.saveMatch')
                 )}
               </Button>
             </DialogFooter>
@@ -315,34 +319,34 @@ export default function FriendPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Trophy className="h-5 w-5" />
-              Statistiche
+              {t('friend.statsTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="daily" className="w-full">
               <TabsList className="w-full grid grid-cols-4">
-                <TabsTrigger value="daily">Oggi</TabsTrigger>
-                <TabsTrigger value="weekly">Sett.</TabsTrigger>
-                <TabsTrigger value="monthly">Mese</TabsTrigger>
-                <TabsTrigger value="yearly">Anno</TabsTrigger>
+                <TabsTrigger value="daily">{t('friend.today')}</TabsTrigger>
+                <TabsTrigger value="weekly">{t('friend.week')}</TabsTrigger>
+                <TabsTrigger value="monthly">{t('friend.month')}</TabsTrigger>
+                <TabsTrigger value="yearly">{t('friend.year')}</TabsTrigger>
               </TabsList>
               <TabsContent value="daily">
-                <StatsCard title="Oggi" stats={dailyStats} />
+                <StatsCard title={t('friend.today')} stats={dailyStats} />
               </TabsContent>
               <TabsContent value="weekly">
-                <StatsCard title="Questa settimana" stats={weeklyStats} />
+                <StatsCard title={t('friend.thisWeek')} stats={weeklyStats} />
               </TabsContent>
               <TabsContent value="monthly">
-                <StatsCard title="Questo mese" stats={monthlyStats} />
+                <StatsCard title={t('friend.thisMonth')} stats={monthlyStats} />
               </TabsContent>
               <TabsContent value="yearly">
-                <StatsCard title="Quest'anno" stats={yearlyStats} />
+                <StatsCard title={t('friend.thisYear')} stats={yearlyStats} />
               </TabsContent>
             </Tabs>
 
             {/* All time stats */}
             <div className="mt-4 pt-4 border-t-3 border-foreground">
-              <StatsCard title="Totale (tutte le partite)" stats={allTimeStats} />
+              <StatsCard title={t('friend.allTime')} stats={allTimeStats} />
             </div>
           </CardContent>
         </Card>
@@ -352,13 +356,13 @@ export default function FriendPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Cronologia Partite
+              {t('friend.matchesTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {matches.length === 0 ? (
               <p className="text-center text-gray-500 py-8">
-                Nessuna partita registrata con {friendName}
+                {t('friend.noMatches', { name: friendName })}
               </p>
             ) : (
               <div className="space-y-2">
@@ -374,9 +378,13 @@ export default function FriendPage() {
                     <div>
                       <p className="font-semibold">
                         {match.winnerId === user?.uid ? (
-                          <span className="text-success">Vittoria</span>
+                          <span className="text-success">
+                            {t('friend.resultVictory')}
+                          </span>
                         ) : (
-                          <span className="text-destructive">Sconfitta</span>
+                          <span className="text-destructive">
+                            {t('friend.resultDefeat')}
+                          </span>
                         )}
                       </p>
                       <p className="text-sm text-gray-600">
@@ -391,16 +399,17 @@ export default function FriendPage() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Elimina partita</AlertDialogTitle>
+                          <AlertDialogTitle>{t('friend.deleteMatchTitle')}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Sei sicuro di voler eliminare questa partita del{' '}
-                            {formatDate(match.date)}? Questa azione non può essere annullata.
+                            {t('friend.deleteMatchDescription', {
+                              date: formatDate(match.date),
+                            })}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Annulla</AlertDialogCancel>
+                          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                           <AlertDialogAction onClick={() => deleteMatch(match.id)}>
-                            Elimina
+                            {t('common.delete')}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
