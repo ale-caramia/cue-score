@@ -73,13 +73,15 @@ service cloud.firestore {
 
     // Group members collection
     match /groupMembers/{membershipId} {
-      // Members of the group can read all memberships
-      allow read: if request.auth != null;
-      // Group creator or the user themselves can create membership
+      // Users can read their own memberships OR memberships of groups they belong to
+      allow read: if request.auth != null &&
+        (resource.data.userId == request.auth.uid ||
+         request.auth.uid in get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.memberIds);
+      // Authenticated users can create memberships
       allow create: if request.auth != null;
-      // Only the user or group creator can delete their membership
+      // Only the user themselves can delete their membership
       allow delete: if request.auth != null &&
-        (resource.data.userId == request.auth.uid);
+        resource.data.userId == request.auth.uid;
     }
 
     // Group matches collection
