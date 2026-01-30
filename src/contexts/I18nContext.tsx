@@ -375,16 +375,10 @@ const translations: Record<Language, TranslationDictionary> = {
   },
 }
 
-type I18nContextValue = {
-  language: Language
-  setLanguage: (language: Language) => void
-  t: (key: string, values?: InterpolationValues) => string
-}
-
-const I18nContext = createContext<I18nContextValue>({
-  language: 'en',
-  setLanguage: () => {},
-  t: () => '',
+const I18nContext = createContext({
+  language: 'en' as Language,
+  setLanguage: (_language: Language) => {},
+  t: (_key: string, _values?: InterpolationValues) => '',
 })
 
 const translateKey = (
