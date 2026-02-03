@@ -53,6 +53,8 @@ import {
   Medal,
   Info,
   MoreVertical,
+  Percent,
+  Hash,
 } from 'lucide-react'
 import {
   formatDate,
@@ -63,7 +65,8 @@ import {
   calculateGroupRankings,
   calculateMatchPoints,
 } from '@/lib/utils'
-import type { Group, GroupMember, GroupMatch, GroupRanking } from '@/lib/types'
+import type { Group, GroupMember, GroupMatch, GroupRanking, GroupSortOption } from '@/lib/types'
+import DesktopSidebar from '@/components/DesktopSidebar'
 
 type PeriodView = 'day' | 'week' | 'month' | 'year'
 
@@ -83,6 +86,7 @@ export default function GroupPage() {
   const [infoDialogOpen, setInfoDialogOpen] = useState(false)
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false)
   const [deletingGroup, setDeletingGroup] = useState(false)
+  const [sortOption, setSortOption] = useState<GroupSortOption>('points')
 
   // Load group details
   useEffect(() => {
@@ -220,7 +224,7 @@ export default function GroupPage() {
     }
 
     const memberIds = members.map((m) => m.userId)
-    return calculateGroupRankings(matches, memberIds, memberNames, startDate)
+    return calculateGroupRankings(matches, memberIds, memberNames, startDate, sortOption)
   }
 
   const rankings = getRankings()
@@ -311,7 +315,8 @@ export default function GroupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-4 md:pl-64">
+      <DesktopSidebar />
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -395,6 +400,33 @@ export default function GroupPage() {
                 <TabsTrigger value="month">{t('group.month')}</TabsTrigger>
                 <TabsTrigger value="year">{t('group.year')}</TabsTrigger>
               </TabsList>
+
+              {/* Sorting Options */}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setSortOption('points')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+                    sortOption === 'points'
+                      ? 'bg-primary text-foreground shadow-brutal-sm'
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <Hash className="h-4 w-4" />
+                  {t('group.sortByPoints')}
+                </button>
+                <button
+                  onClick={() => setSortOption('winPercentage')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+                    sortOption === 'winPercentage'
+                      ? 'bg-primary text-foreground shadow-brutal-sm'
+                      : 'bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <Percent className="h-4 w-4" />
+                  {t('group.sortByWinRate')}
+                </button>
+              </div>
+
               <TabsContent value={currentView} className="mt-4">
                 {rankings.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
@@ -423,11 +455,39 @@ export default function GroupPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">
-                            {ranking.points}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{t('common.points')}</p>
+                          {sortOption === 'points' ? (
+                            <>
+                              <p className="text-2xl font-bold text-primary">
+                                {ranking.points}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{t('common.points')}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-2xl font-bold text-primary">
+                                {ranking.winPercentage}%
+                              </p>
+                              <p className="text-xs text-muted-foreground">{t('group.winRate')}</p>
+                            </>
+                          )}
                         </div>
+                        {/* Show secondary stat in smaller text */}
+                        {sortOption === 'points' && ranking.matchesPlayed > 0 && (
+                          <div className="text-right ml-3 min-w-[50px]">
+                            <p className="text-sm font-semibold text-secondary">
+                              {ranking.winPercentage}%
+                            </p>
+                            <p className="text-xs text-muted-foreground">{t('group.winRate')}</p>
+                          </div>
+                        )}
+                        {sortOption === 'winPercentage' && (
+                          <div className="text-right ml-3 min-w-[50px]">
+                            <p className="text-sm font-semibold text-secondary">
+                              {ranking.points}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{t('common.points')}</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

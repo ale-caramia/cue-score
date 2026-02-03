@@ -36,7 +36,8 @@ import {
   doc,
   onSnapshot,
   orderBy,
-  getDoc
+  getDoc,
+  getDocs,
 } from 'firebase/firestore'
 import {
   ArrowLeft,
@@ -44,9 +45,12 @@ import {
   Plus,
   Calendar,
   Trash2,
-  Loader2
+  Loader2,
+  Users,
 } from 'lucide-react'
-import { formatDate, getStartOfDay, getStartOfWeek, getStartOfMonth, getStartOfYear } from '@/lib/utils'
+import { formatDate, getStartOfDay, getStartOfWeek, getStartOfMonth, getStartOfYear, getGroup1v1MatchesWithFriend } from '@/lib/utils'
+import type { GroupMatch, FriendStatsMode } from '@/lib/types'
+import DesktopSidebar from '@/components/DesktopSidebar'
 
 interface Match {
   id: string
@@ -73,12 +77,14 @@ export default function FriendPage() {
   const { t } = useI18n()
   const [friendName, setFriendName] = useState('')
   const [matches, setMatches] = useState<Match[]>([])
+  const [groupMatches, setGroupMatches] = useState<GroupMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [addMatchOpen, setAddMatchOpen] = useState(false)
   const [matchDate, setMatchDate] = useState(new Date().toISOString().split('T')[0])
   const [winner, setWinner] = useState<'me' | 'friend' | ''>('')
   const [saving, setSaving] = useState(false)
   const [_deleteMatchId, setDeleteMatchId] = useState<string | null>(null)
+  const [statsMode, setStatsMode] = useState<FriendStatsMode>('friendsOnly')
 
   // Load friend name
   useEffect(() => {
@@ -133,10 +139,79 @@ export default function FriendPage() {
     return () => unsubscribe()
   }, [user, friendId])
 
+  // Load group 1v1 matches with this friend
+  useEffect(() => {
+    if (!user || !friendId) return
+
+    const loadGroupMatches = async () => {
+      // Get all groups where current user is a member
+      const memberQuery = query(
+        collection(db, 'groupMembers'),
+        where('userId', '==', user.uid)
+      )
+      const memberSnapshot = await getDocs(memberQuery)
+      const groupIds: string[] = []
+      memberSnapshot.forEach((doc) => {
+        groupIds.push(doc.data().groupId)
+      })
+
+      if (groupIds.length === 0) {
+        setGroupMatches([])
+        return
+      }
+
+      // Get all group matches
+      const allGroupMatches: GroupMatch[] = []
+      for (const groupId of groupIds) {
+        const matchesQuery = query(
+          collection(db, 'groupMatches'),
+          where('groupId', '==', groupId)
+        )
+        const matchesSnapshot = await getDocs(matchesQuery)
+        matchesSnapshot.forEach((doc) => {
+          const data = doc.data()
+          // Only include 1v1 matches with this friend
+          if (
+            data.teamA.length === 1 &&
+            data.teamB.length === 1 &&
+            data.allPlayerIds.includes(user.uid) &&
+            data.allPlayerIds.includes(friendId)
+          ) {
+            allGroupMatches.push({
+              id: doc.id,
+              groupId: data.groupId,
+              teamA: data.teamA,
+              teamB: data.teamB,
+              teamANames: data.teamANames,
+              teamBNames: data.teamBNames,
+              winningTeam: data.winningTeam,
+              date: data.date.toDate(),
+              createdAt: data.createdAt.toDate(),
+              createdBy: data.createdBy,
+              pointsAwarded: data.pointsAwarded,
+              allPlayerIds: data.allPlayerIds,
+            })
+          }
+        })
+      }
+      setGroupMatches(allGroupMatches)
+    }
+
+    loadGroupMatches()
+  }, [user, friendId])
+
   const calculateStats = (periodStart: Date): Stats => {
+    // Friend matches stats
     const periodMatches = matches.filter((m) => m.date >= periodStart)
-    const wins = periodMatches.filter((m) => m.winnerId === user?.uid).length
-    const losses = periodMatches.filter((m) => m.winnerId === friendId).length
+    let wins = periodMatches.filter((m) => m.winnerId === user?.uid).length
+    let losses = periodMatches.filter((m) => m.winnerId === friendId).length
+
+    // Add group 1v1 matches if combined mode is active
+    if (statsMode === 'combined' && user && friendId) {
+      const groupStats = getGroup1v1MatchesWithFriend(groupMatches, user.uid, friendId, periodStart)
+      wins += groupStats.wins
+      losses += groupStats.losses
+    }
 
     return { wins, losses, total: wins + losses }
   }
@@ -217,7 +292,8 @@ export default function FriendPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background md:pl-64">
+      <DesktopSidebar />
       {/* Header */}
       <header className="bg-secondary border-b-3 border-foreground p-4">
         <div className="max-w-lg mx-auto flex items-center gap-4">
@@ -317,10 +393,42 @@ export default function FriendPage() {
         {/* Stats */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              {t('friend.statsTitle')}
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5" />
+                {t('friend.statsTitle')}
+              </div>
             </CardTitle>
+            {/* Stats Mode Toggle */}
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => setStatsMode('friendsOnly')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+                  statsMode === 'friendsOnly'
+                    ? 'bg-secondary text-foreground shadow-brutal-sm'
+                    : 'bg-white hover:bg-gray-50'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                {t('friend.friendsOnlyMode')}
+              </button>
+              <button
+                onClick={() => setStatsMode('combined')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+                  statsMode === 'combined'
+                    ? 'bg-secondary text-foreground shadow-brutal-sm'
+                    : 'bg-white hover:bg-gray-50'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                {t('friend.combinedMode')}
+              </button>
+            </div>
+            {statsMode === 'combined' && groupMatches.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {t('friend.combinedModeHint', { count: groupMatches.length })}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="daily" className="w-full">

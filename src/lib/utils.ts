@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import type { GroupMatch, GroupRanking } from './types'
+import type { GroupMatch, GroupRanking, GroupSortOption } from './types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -59,7 +59,8 @@ export function calculateGroupRankings(
   matches: GroupMatch[],
   memberIds: string[],
   memberNames: Map<string, string>,
-  startDate?: Date
+  startDate?: Date,
+  sortBy: GroupSortOption = 'points'
 ): GroupRanking[] {
   const rankings = new Map<string, { points: number; matchesPlayed: number; matchesWon: number }>()
 
@@ -102,7 +103,7 @@ export function calculateGroupRankings(
     })
   })
 
-  // Convert to array and sort by points (descending)
+  // Convert to array with win percentage and sort
   return Array.from(rankings.entries())
     .map(([userId, stats]) => ({
       userId,
@@ -110,11 +111,60 @@ export function calculateGroupRankings(
       points: stats.points,
       matchesPlayed: stats.matchesPlayed,
       matchesWon: stats.matchesWon,
+      winPercentage: stats.matchesPlayed > 0
+        ? Math.round((stats.matchesWon / stats.matchesPlayed) * 100)
+        : 0,
     }))
     .sort((a, b) => {
+      if (sortBy === 'winPercentage') {
+        // Sort by win percentage descending, then by matches played, then by name
+        if (b.winPercentage !== a.winPercentage) return b.winPercentage - a.winPercentage
+        if (b.matchesPlayed !== a.matchesPlayed) return b.matchesPlayed - a.matchesPlayed
+        return a.userName.localeCompare(b.userName)
+      }
       // Sort by points descending, then by matches won, then by name
       if (b.points !== a.points) return b.points - a.points
       if (b.matchesWon !== a.matchesWon) return b.matchesWon - a.matchesWon
       return a.userName.localeCompare(b.userName)
     })
+}
+
+/**
+ * Filter group matches to find 1v1 matches between the current user and a specific friend
+ */
+export function getGroup1v1MatchesWithFriend(
+  matches: GroupMatch[],
+  userId: string,
+  friendId: string,
+  startDate?: Date
+): { wins: number; losses: number; total: number } {
+  // Filter for 1v1 matches only (one player per team)
+  const oneVsOneMatches = matches.filter(match =>
+    match.teamA.length === 1 &&
+    match.teamB.length === 1 &&
+    match.allPlayerIds.includes(userId) &&
+    match.allPlayerIds.includes(friendId)
+  )
+
+  // Apply date filter if provided
+  const filteredMatches = startDate
+    ? oneVsOneMatches.filter(match => match.date >= startDate)
+    : oneVsOneMatches
+
+  let wins = 0
+  let losses = 0
+
+  filteredMatches.forEach(match => {
+    const userInTeamA = match.teamA.includes(userId)
+    const userWon = (userInTeamA && match.winningTeam === 'A') ||
+                    (!userInTeamA && match.winningTeam === 'B')
+
+    if (userWon) {
+      wins++
+    } else {
+      losses++
+    }
+  })
+
+  return { wins, losses, total: wins + losses }
 }

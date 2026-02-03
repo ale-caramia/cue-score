@@ -37,6 +37,7 @@ import {
   LogOut
 } from 'lucide-react'
 import MobileBottomNav from '@/components/MobileBottomNav'
+import DesktopSidebar from '@/components/DesktopSidebar'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 interface Friend {
@@ -376,7 +377,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background md:pl-64">
+      <DesktopSidebar />
       {/* Header */}
       <header className="bg-primary border-b-3 border-foreground p-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">

@@ -85,4 +85,9 @@ export interface GroupRanking {
   points: number
   matchesPlayed: number
   matchesWon: number
+  winPercentage: number
 }
+
+export type GroupSortOption = 'points' | 'winPercentage'
+
+export type FriendStatsMode = 'friendsOnly' | 'combined'

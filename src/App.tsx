@@ -7,6 +7,7 @@ import FriendPage from '@/pages/FriendPage'
 import GroupsPage from '@/pages/GroupsPage'
 import GroupPage from '@/pages/GroupPage'
 import TournamentsPage from '@/pages/TournamentsPage'
+import PWAUpdatePrompt from '@/components/PWAUpdatePrompt'
 import { Loader2 } from 'lucide-react'
 
 function LoadingScreen() {
@@ -51,6 +52,7 @@ function App() {
       <LanguageProvider>
         <AuthProvider>
           <ProtectedRoutes />
+          <PWAUpdatePrompt />
         </AuthProvider>
       </LanguageProvider>
     </BrowserRouter>
