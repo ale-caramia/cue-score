@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom'
 import { Users, Plus, ArrowLeft, Info } from 'lucide-react'
 import type { Group } from '@/lib/types'
 import MobileBottomNav from '@/components/MobileBottomNav'
+import DesktopSidebar from '@/components/DesktopSidebar'
 
 export default function GroupsPage() {
   const { user, userData } = useAuth()
@@ -128,7 +129,8 @@ export default function GroupsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-24 md:pb-4">
+    <div className="min-h-screen bg-background p-4 pb-24 md:pb-4 md:pl-64">
+      <DesktopSidebar />
       <div className="max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">

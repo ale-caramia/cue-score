@@ -41,6 +41,7 @@ const translations: Record<Language, TranslationDictionary> = {
       friends: 'Friends',
       groups: 'Groups',
       tournaments: 'Tournaments',
+      desktopHint: 'Navigate between sections',
     },
     home: {
       friendRequests: 'Friend Requests ({{count}})',
@@ -136,6 +137,9 @@ const translations: Record<Language, TranslationDictionary> = {
       deleteMatchTitle: 'Delete match',
       deleteMatchDescription:
         'Are you sure you want to delete the match on {{date}}? This action cannot be undone.',
+      friendsOnlyMode: 'Friends',
+      combinedMode: '+ Groups',
+      combinedModeHint: 'Including {{count}} 1v1 group matches',
     },
     group: {
       addMatch: 'Add Match',
@@ -194,6 +198,9 @@ const translations: Record<Language, TranslationDictionary> = {
       matchesWon: '{{won}}/{{total}} matches won',
       adminLabel: 'Admin',
       pointsAwarded: '+{{points}} points for winners',
+      sortByPoints: 'By Score',
+      sortByWinRate: 'By Win %',
+      winRate: 'win rate',
     },
   },
   it: {
@@ -221,6 +228,7 @@ const translations: Record<Language, TranslationDictionary> = {
       friends: 'Amici',
       groups: 'Gruppi',
       tournaments: 'Tornei',
+      desktopHint: 'Naviga tra le sezioni',
     },
     home: {
       friendRequests: 'Richieste di amicizia ({{count}})',
@@ -319,6 +327,9 @@ const translations: Record<Language, TranslationDictionary> = {
       deleteMatchTitle: 'Elimina partita',
       deleteMatchDescription:
         'Sei sicuro di voler eliminare la partita del {{date}}? Questa azione non può essere annullata.',
+      friendsOnlyMode: 'Amici',
+      combinedMode: '+ Gruppi',
+      combinedModeHint: 'Include {{count}} partite 1v1 nei gruppi',
     },
     group: {
       addMatch: 'Aggiungi partita',
@@ -377,6 +388,9 @@ const translations: Record<Language, TranslationDictionary> = {
       matchesWon: '{{won}}/{{total}} partite vinte',
       adminLabel: 'Admin',
       pointsAwarded: '+{{points}} punti per i vincitori',
+      sortByPoints: 'Per Punti',
+      sortByWinRate: 'Per % Vinte',
+      winRate: '% vittorie',
     },
   },
 }
