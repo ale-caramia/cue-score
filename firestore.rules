@@ -119,9 +119,10 @@ service cloud.firestore {
 
     // User group preferences collection
     match /userGroupPreferences/{preferenceId} {
-      // Users can only read their own preferences
+      // Users can only read their own preferences, or group admins can read when deleting groups
       allow read: if request.auth != null &&
-        resource.data.userId == request.auth.uid;
+        (resource.data.userId == request.auth.uid ||
+         request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
       // Users can only create/update their own preferences
       allow create, update: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
