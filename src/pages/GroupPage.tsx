@@ -32,10 +32,12 @@ import {
   addDoc,
   deleteDoc,
   doc,
+  DocumentData,
   onSnapshot,
   orderBy,
   getDoc,
   getDocs,
+  QueryDocumentSnapshot,
   Timestamp,
   updateDoc,
   arrayUnion,
@@ -287,43 +289,49 @@ export default function GroupPage() {
 
     setDeletingGroup(true)
     try {
-      // First, delete all related documents (members, matches, preferences, unregistered users)
-      const batch = writeBatch(db)
+      const commitBatches = async (docs: QueryDocumentSnapshot<DocumentData>[]) => {
+        let batch = writeBatch(db)
+        let batchCount = 0
+
+        for (const snapshotDoc of docs) {
+          batch.delete(snapshotDoc.ref)
+          batchCount += 1
+
+          if (batchCount >= 450) {
+            await batch.commit()
+            batch = writeBatch(db)
+            batchCount = 0
+          }
+        }
+
+        if (batchCount > 0) {
+          await batch.commit()
+        }
+      }
 
       // Delete all group members
       const membersSnapshot = await getDocs(
         query(collection(db, 'groupMembers'), where('groupId', '==', groupId))
       )
-      membersSnapshot.forEach((doc) => {
-        batch.delete(doc.ref)
-      })
+      await commitBatches(membersSnapshot.docs)
 
       // Delete all group matches
       const matchesSnapshot = await getDocs(
         query(collection(db, 'groupMatches'), where('groupId', '==', groupId))
       )
-      matchesSnapshot.forEach((doc) => {
-        batch.delete(doc.ref)
-      })
+      await commitBatches(matchesSnapshot.docs)
 
       // Delete all user preferences for this group
       const preferencesSnapshot = await getDocs(
         query(collection(db, 'userGroupPreferences'), where('groupId', '==', groupId))
       )
-      preferencesSnapshot.forEach((doc) => {
-        batch.delete(doc.ref)
-      })
+      await commitBatches(preferencesSnapshot.docs)
 
       // Delete all unregistered users for this group
       const unregisteredSnapshot = await getDocs(
         query(collection(db, 'unregisteredGroupUsers'), where('groupId', '==', groupId))
       )
-      unregisteredSnapshot.forEach((doc) => {
-        batch.delete(doc.ref)
-      })
-
-      // Commit the batch for related documents
-      await batch.commit()
+      await commitBatches(unregisteredSnapshot.docs)
 
       // Finally, delete the group document separately
       // This must be done AFTER deleting related docs because the rules use get()
