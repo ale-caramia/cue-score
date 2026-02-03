@@ -43,6 +43,12 @@ const translations: Record<Language, TranslationDictionary> = {
       tournaments: 'Tournaments',
       desktopHint: 'Navigate between sections',
     },
+    pwa: {
+      updateTitle: 'Update Available',
+      updateDescription: 'A new version of Cue Score is available. Reload now to get the latest features and improvements.',
+      updateNow: 'Reload Now',
+      updateLater: 'Later',
+    },
     home: {
       friendRequests: 'Friend Requests ({{count}})',
       addFriend: 'Add Friend',
@@ -229,6 +235,12 @@ const translations: Record<Language, TranslationDictionary> = {
       groups: 'Gruppi',
       tournaments: 'Tornei',
       desktopHint: 'Naviga tra le sezioni',
+    },
+    pwa: {
+      updateTitle: 'Aggiornamento Disponibile',
+      updateDescription: 'Una nuova versione di Cue Score è disponibile. Ricarica ora per ottenere le ultime funzionalità e miglioramenti.',
+      updateNow: 'Ricarica Ora',
+      updateLater: 'Più Tardi',
     },
     home: {
       friendRequests: 'Richieste di amicizia ({{count}})',
