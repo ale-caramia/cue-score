@@ -17,6 +17,7 @@ import {
   collection,
   query,
   where,
+  getDocs,
   getDoc,
   doc,
   addDoc,
@@ -25,7 +26,7 @@ import {
   orderBy,
 } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
-import { Users, Plus, ArrowLeft, Info } from 'lucide-react'
+import { Users, Plus, ArrowLeft, Info, Loader2 } from 'lucide-react'
 import type { Group } from '@/lib/types'
 import MobileBottomNav from '@/components/MobileBottomNav'
 import DesktopSidebar from '@/components/DesktopSidebar'
@@ -40,11 +41,13 @@ export default function GroupsPage() {
   const [infoDialogOpen, setInfoDialogOpen] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   // Load user's groups
   useEffect(() => {
     if (!user) return
 
+    setLoading(true)
     const membersQuery = query(
       collection(db, 'groupMembers'),
       where('userId', '==', user.uid),
@@ -60,6 +63,8 @@ export default function GroupsPage() {
 
       if (groupIds.length === 0) {
         setGroups([])
+        setGroupMembers(new Map())
+        setLoading(false)
         return
       }
 
@@ -88,10 +93,24 @@ export default function GroupsPage() {
 
       // Load member counts
       const memberCounts = new Map<string, number>()
-      for (const group of groupsList) {
-        memberCounts.set(group.id, group.memberIds.length)
-      }
+      const unregisteredCounts = await Promise.all(
+        groupsList.map(async (group) => {
+          const unregisteredSnapshot = await getDocs(
+            query(
+              collection(db, 'unregisteredGroupUsers'),
+              where('groupId', '==', group.id)
+            )
+          )
+          return unregisteredSnapshot.size
+        })
+      )
+
+      groupsList.forEach((group, index) => {
+        const guestCount = unregisteredCounts[index] ?? 0
+        memberCounts.set(group.id, group.memberIds.length + guestCount)
+      })
       setGroupMembers(memberCounts)
+      setLoading(false)
     })
 
     return () => unsubscribe()
@@ -192,7 +211,14 @@ export default function GroupsPage() {
         </Dialog>
 
         {/* Groups List */}
-        {groups.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="p-8 text-center space-y-3">
+              <Loader2 className="h-10 w-10 mx-auto animate-spin text-muted-foreground" />
+              <p className="text-muted-foreground">{t('common.loading')}</p>
+            </CardContent>
+          </Card>
+        ) : groups.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />

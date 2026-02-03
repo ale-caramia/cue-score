@@ -59,6 +59,7 @@ import {
   Hash,
   Link2,
   UserX,
+  Loader2,
 } from 'lucide-react'
 import {
   formatDate,
@@ -82,7 +83,10 @@ export default function GroupPage() {
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<GroupMember[]>([])
   const [matches, setMatches] = useState<GroupMatch[]>([])
-  const [loading, setLoading] = useState(true)
+  const [groupLoading, setGroupLoading] = useState(true)
+  const [membersLoading, setMembersLoading] = useState(true)
+  const [matchesLoading, setMatchesLoading] = useState(true)
+  const [unregisteredLoading, setUnregisteredLoading] = useState(true)
   const [currentView, setCurrentView] = useState<PeriodView>('week')
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [addMatchOpen, setAddMatchOpen] = useState(false)
@@ -95,9 +99,19 @@ export default function GroupPage() {
   const [memberToLink, setMemberToLink] = useState<GroupMember | null>(null)
   const [unregisteredUsers, setUnregisteredUsers] = useState<UnregisteredGroupUser[]>([])
 
+  useEffect(() => {
+    setGroupLoading(true)
+    setMembersLoading(true)
+    setMatchesLoading(true)
+    setUnregisteredLoading(true)
+  }, [groupId])
+
   // Load group details
   useEffect(() => {
-    if (!groupId) return
+    if (!groupId) {
+      setGroupLoading(false)
+      return
+    }
 
     const unsubscribe = onSnapshot(doc(db, 'groups', groupId), (snapshot) => {
       if (snapshot.exists()) {
@@ -109,6 +123,9 @@ export default function GroupPage() {
           createdAt: data.createdAt.toDate(),
           memberIds: data.memberIds || [],
         })
+        setGroupLoading(false)
+      } else {
+        setGroupLoading(false)
       }
     })
 
@@ -117,7 +134,10 @@ export default function GroupPage() {
 
   // Load group members
   useEffect(() => {
-    if (!groupId) return
+    if (!groupId) {
+      setMembersLoading(false)
+      return
+    }
 
     const membersQuery = query(
       collection(db, 'groupMembers'),
@@ -137,6 +157,7 @@ export default function GroupPage() {
         })
       })
       setMembers(membersList)
+      setMembersLoading(false)
     })
 
     return () => unsubscribe()
@@ -144,7 +165,10 @@ export default function GroupPage() {
 
   // Load group matches
   useEffect(() => {
-    if (!groupId) return
+    if (!groupId) {
+      setMatchesLoading(false)
+      return
+    }
 
     const matchesQuery = query(
       collection(db, 'groupMatches'),
@@ -172,7 +196,7 @@ export default function GroupPage() {
         })
       })
       setMatches(matchesList)
-      setLoading(false)
+      setMatchesLoading(false)
     })
 
     return () => unsubscribe()
@@ -180,7 +204,10 @@ export default function GroupPage() {
 
   // Load unregistered users for this group
   useEffect(() => {
-    if (!groupId) return
+    if (!groupId) {
+      setUnregisteredLoading(false)
+      return
+    }
 
     const unregisteredQuery = query(
       collection(db, 'unregisteredGroupUsers'),
@@ -202,6 +229,7 @@ export default function GroupPage() {
         })
       })
       setUnregisteredUsers(usersList)
+      setUnregisteredLoading(false)
     })
 
     return () => unsubscribe()
@@ -361,10 +389,16 @@ export default function GroupPage() {
     }
   }
 
-  if (loading || !group) {
+  const isLoading =
+    groupLoading || membersLoading || matchesLoading || unregisteredLoading
+
+  if (isLoading || !group) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p>{t('common.loading')}</p>
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p>{t('common.loading')}</p>
+        </div>
       </div>
     )
   }
@@ -530,7 +564,7 @@ export default function GroupPage() {
                           )}
                         </div>
                         {/* Show secondary stat in smaller text */}
-                        {sortOption === 'points' && ranking.matchesPlayed > 0 && (
+                        {sortOption === 'points' && (
                           <div className="text-right ml-3 min-w-[50px]">
                             <p className="text-sm font-semibold text-secondary">
                               {ranking.winPercentage}%
