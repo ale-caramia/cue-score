@@ -78,9 +78,26 @@ service cloud.firestore {
       allow read: if request.auth != null;
       // Authenticated users can create memberships
       allow create: if request.auth != null;
+      // Allow update for linking unregistered users to registered users
+      allow update: if request.auth != null;
       // Only the user themselves OR the group admin can delete their membership
       allow delete: if request.auth != null &&
         (resource.data.userId == request.auth.uid ||
+         request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
+    }
+
+    // Unregistered group users collection
+    match /unregisteredGroupUsers/{userId} {
+      // Allow reading for authenticated users
+      allow read: if request.auth != null;
+      // Authenticated users can create unregistered users
+      allow create: if request.auth != null &&
+        request.resource.data.createdBy == request.auth.uid;
+      // Allow update for linking to registered users
+      allow update: if request.auth != null;
+      // Only the creator OR the group admin can delete
+      allow delete: if request.auth != null &&
+        (resource.data.createdBy == request.auth.uid ||
          request.auth.uid == get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.createdBy);
     }
 

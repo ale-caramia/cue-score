@@ -55,6 +55,8 @@ import {
   MoreVertical,
   Percent,
   Hash,
+  Link2,
+  UserX,
 } from 'lucide-react'
 import {
   formatDate,
@@ -65,7 +67,7 @@ import {
   calculateGroupRankings,
   calculateMatchPoints,
 } from '@/lib/utils'
-import type { Group, GroupMember, GroupMatch, GroupRanking, GroupSortOption } from '@/lib/types'
+import type { Group, GroupMember, GroupMatch, GroupRanking, GroupSortOption, UnregisteredGroupUser } from '@/lib/types'
 import DesktopSidebar from '@/components/DesktopSidebar'
 
 type PeriodView = 'day' | 'week' | 'month' | 'year'
@@ -87,6 +89,9 @@ export default function GroupPage() {
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false)
   const [deletingGroup, setDeletingGroup] = useState(false)
   const [sortOption, setSortOption] = useState<GroupSortOption>('points')
+  const [linkUserOpen, setLinkUserOpen] = useState(false)
+  const [memberToLink, setMemberToLink] = useState<GroupMember | null>(null)
+  const [unregisteredUsers, setUnregisteredUsers] = useState<UnregisteredGroupUser[]>([])
 
   // Load group details
   useEffect(() => {
@@ -171,6 +176,35 @@ export default function GroupPage() {
     return () => unsubscribe()
   }, [groupId])
 
+  // Load unregistered users for this group
+  useEffect(() => {
+    if (!groupId) return
+
+    const unregisteredQuery = query(
+      collection(db, 'unregisteredGroupUsers'),
+      where('groupId', '==', groupId)
+    )
+
+    const unsubscribe = onSnapshot(unregisteredQuery, (snapshot) => {
+      const usersList: UnregisteredGroupUser[] = []
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        usersList.push({
+          id: doc.id,
+          name: data.name,
+          groupId: data.groupId,
+          createdAt: data.createdAt.toDate(),
+          createdBy: data.createdBy,
+          linkedToUserId: data.linkedToUserId,
+          linkedAt: data.linkedAt?.toDate(),
+        })
+      })
+      setUnregisteredUsers(usersList)
+    })
+
+    return () => unsubscribe()
+  }, [groupId])
+
   // Load user's preferred view for this group
   useEffect(() => {
     if (!user || !groupId) return
@@ -202,10 +236,12 @@ export default function GroupPage() {
     })
   }
 
-  // Calculate rankings for the current period
+  // Calculate rankings for the current period (includes both registered and unregistered users)
   const getRankings = (): GroupRanking[] => {
     const memberNames = new Map<string, string>()
     members.forEach((m) => memberNames.set(m.userId, m.userName))
+    // Add unregistered users with unregistered_ prefix
+    unregisteredUsers.forEach((u) => memberNames.set(`unregistered_${u.id}`, u.name))
 
     let startDate: Date | undefined
     switch (currentView) {
@@ -223,7 +259,10 @@ export default function GroupPage() {
         break
     }
 
-    const memberIds = members.map((m) => m.userId)
+    const memberIds = [
+      ...members.map((m) => m.userId),
+      ...unregisteredUsers.map((u) => `unregistered_${u.id}`),
+    ]
     return calculateGroupRankings(matches, memberIds, memberNames, startDate, sortOption)
   }
 
@@ -248,7 +287,7 @@ export default function GroupPage() {
 
     setDeletingGroup(true)
     try {
-      // First, delete all related documents (members, matches, preferences)
+      // First, delete all related documents (members, matches, preferences, unregistered users)
       const batch = writeBatch(db)
 
       // Delete all group members
@@ -272,6 +311,14 @@ export default function GroupPage() {
         query(collection(db, 'userGroupPreferences'), where('groupId', '==', groupId))
       )
       preferencesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref)
+      })
+
+      // Delete all unregistered users for this group
+      const unregisteredSnapshot = await getDocs(
+        query(collection(db, 'unregisteredGroupUsers'), where('groupId', '==', groupId))
+      )
+      unregisteredSnapshot.forEach((doc) => {
         batch.delete(doc.ref)
       })
 
@@ -366,6 +413,7 @@ export default function GroupPage() {
             <RecordMatchDialog
               groupId={groupId!}
               members={members}
+              unregisteredUsers={unregisteredUsers}
               onClose={() => setAddMatchOpen(false)}
             />
           </Dialog>
@@ -380,6 +428,8 @@ export default function GroupPage() {
             <AddMemberDialog
               groupId={groupId!}
               currentMembers={members}
+              unregisteredUsers={unregisteredUsers}
+              onClose={() => setAddMemberOpen(false)}
             />
           </Dialog>
         </div>
@@ -502,11 +552,12 @@ export default function GroupPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              {t('group.membersTitle', { count: members.length })}
+              {t('group.membersTitle', { count: members.length + unregisteredUsers.length })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
+              {/* Registered members */}
               {members.map((member) => (
                 <div
                   key={member.id}
@@ -517,6 +568,42 @@ export default function GroupPage() {
                     <span className="text-xs bg-accent text-foreground px-2 py-1 rounded font-semibold">
                       {t('group.adminLabel')}
                     </span>
+                  )}
+                </div>
+              ))}
+              {/* Unregistered members */}
+              {unregisteredUsers.map((unregUser) => (
+                <div
+                  key={unregUser.id}
+                  className="flex items-center justify-between p-2 rounded border border-foreground bg-muted/30"
+                >
+                  <div className="flex items-center gap-2">
+                    <UserX className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{unregUser.name}</span>
+                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
+                      {t('group.unregisteredLabel')}
+                    </span>
+                  </div>
+                  {!unregUser.linkedToUserId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setMemberToLink({
+                          id: unregUser.id,
+                          groupId: unregUser.groupId,
+                          userId: `unregistered_${unregUser.id}`,
+                          userName: unregUser.name,
+                          joinedAt: unregUser.createdAt,
+                          isUnregistered: true,
+                        })
+                        setLinkUserOpen(true)
+                      }}
+                    >
+                      <Link2 className="h-3 w-3 mr-1" />
+                      {t('group.linkUser')}
+                    </Button>
                   )}
                 </div>
               ))}
@@ -669,6 +756,19 @@ export default function GroupPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Link User Dialog */}
+        <Dialog open={linkUserOpen} onOpenChange={setLinkUserOpen}>
+          <LinkUserDialog
+            groupId={groupId!}
+            memberToLink={memberToLink}
+            currentMembers={members}
+            onClose={() => {
+              setLinkUserOpen(false)
+              setMemberToLink(null)
+            }}
+          />
+        </Dialog>
       </div>
     </div>
   )
@@ -678,10 +778,12 @@ export default function GroupPage() {
 function RecordMatchDialog({
   groupId,
   members,
+  unregisteredUsers,
   onClose,
 }: {
   groupId: string
   members: GroupMember[]
+  unregisteredUsers: UnregisteredGroupUser[]
   onClose: () => void
 }) {
   const { user } = useAuth()
@@ -692,28 +794,34 @@ function RecordMatchDialog({
   const [winningTeam, setWinningTeam] = useState<'A' | 'B' | ''>('')
   const [saving, setSaving] = useState(false)
 
-  const togglePlayerTeamA = (userId: string) => {
-    if (teamA.includes(userId)) {
-      setTeamA(teamA.filter((id) => id !== userId))
+  // Combine registered members and unregistered users into a single list
+  const allPlayers = [
+    ...members.map((m) => ({ id: m.userId, name: m.userName, isUnregistered: false })),
+    ...unregisteredUsers.map((u) => ({ id: `unregistered_${u.id}`, name: u.name, isUnregistered: true })),
+  ]
+
+  const togglePlayerTeamA = (playerId: string) => {
+    if (teamA.includes(playerId)) {
+      setTeamA(teamA.filter((id) => id !== playerId))
     } else {
-      setTeamA([...teamA, userId])
-      setTeamB(teamB.filter((id) => id !== userId))
+      setTeamA([...teamA, playerId])
+      setTeamB(teamB.filter((id) => id !== playerId))
     }
   }
 
-  const togglePlayerTeamB = (userId: string) => {
-    if (teamB.includes(userId)) {
-      setTeamB(teamB.filter((id) => id !== userId))
+  const togglePlayerTeamB = (playerId: string) => {
+    if (teamB.includes(playerId)) {
+      setTeamB(teamB.filter((id) => id !== playerId))
     } else {
-      setTeamB([...teamB, userId])
-      setTeamA(teamA.filter((id) => id !== userId))
+      setTeamB([...teamB, playerId])
+      setTeamA(teamA.filter((id) => id !== playerId))
     }
   }
 
   const canSave =
     teamA.length >= 1 &&
     teamB.length >= 1 &&
-    teamA.length + teamB.length <= members.length &&
+    teamA.length + teamB.length <= allPlayers.length &&
     winningTeam !== ''
 
   const handleSave = async () => {
@@ -722,10 +830,10 @@ function RecordMatchDialog({
     setSaving(true)
     try {
       const teamANames = teamA.map(
-        (id) => members.find((m) => m.userId === id)?.userName || ''
+        (id) => allPlayers.find((p) => p.id === id)?.name || ''
       )
       const teamBNames = teamB.map(
-        (id) => members.find((m) => m.userId === id)?.userName || ''
+        (id) => allPlayers.find((p) => p.id === id)?.name || ''
       )
 
       const pointsAwarded = calculateMatchPoints(teamA.length, teamB.length, winningTeam)
@@ -781,14 +889,19 @@ function RecordMatchDialog({
             {t('group.teamA')} ({teamA.length})
           </label>
           <div className="space-y-2">
-            {members.map((member) => (
+            {allPlayers.map((player) => (
               <Button
-                key={member.id}
-                variant={teamA.includes(member.userId) ? 'default' : 'outline'}
+                key={player.id}
+                variant={teamA.includes(player.id) ? 'default' : 'outline'}
                 className="w-full justify-start"
-                onClick={() => togglePlayerTeamA(member.userId)}
+                onClick={() => togglePlayerTeamA(player.id)}
               >
-                {member.userName}
+                <span className="flex items-center gap-2">
+                  {player.name}
+                  {player.isUnregistered && (
+                    <UserX className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </span>
               </Button>
             ))}
           </div>
@@ -800,14 +913,19 @@ function RecordMatchDialog({
             {t('group.teamB')} ({teamB.length})
           </label>
           <div className="space-y-2">
-            {members.map((member) => (
+            {allPlayers.map((player) => (
               <Button
-                key={member.id}
-                variant={teamB.includes(member.userId) ? 'default' : 'outline'}
+                key={player.id}
+                variant={teamB.includes(player.id) ? 'default' : 'outline'}
                 className="w-full justify-start"
-                onClick={() => togglePlayerTeamB(member.userId)}
+                onClick={() => togglePlayerTeamB(player.id)}
               >
-                {member.userName}
+                <span className="flex items-center gap-2">
+                  {player.name}
+                  {player.isUnregistered && (
+                    <UserX className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </span>
               </Button>
             ))}
           </div>
@@ -853,18 +971,26 @@ function RecordMatchDialog({
 function AddMemberDialog({
   groupId,
   currentMembers,
+  unregisteredUsers,
+  onClose,
 }: {
   groupId: string
   currentMembers: GroupMember[]
+  unregisteredUsers: UnregisteredGroupUser[]
+  onClose: () => void
 }) {
   const { user } = useAuth()
   const { t } = useI18n()
+  const [mode, setMode] = useState<'registered' | 'unregistered'>('registered')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ id: string; displayName: string }[]>([])
   const [searching, setSearching] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
+  const [unregisteredName, setUnregisteredName] = useState('')
+  const [creatingUnregistered, setCreatingUnregistered] = useState(false)
 
   const currentMemberIds = currentMembers.map((m) => m.userId)
+  const existingUnregisteredNames = unregisteredUsers.map((u) => u.name.toLowerCase())
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -927,12 +1053,243 @@ function AddMemberDialog({
     }
   }
 
+  const handleCreateUnregisteredUser = async () => {
+    if (!user || !unregisteredName.trim()) return
+
+    // Check if name already exists
+    if (existingUnregisteredNames.includes(unregisteredName.trim().toLowerCase())) {
+      alert(t('group.unregisteredNameExists'))
+      return
+    }
+
+    setCreatingUnregistered(true)
+    try {
+      await addDoc(collection(db, 'unregisteredGroupUsers'), {
+        name: unregisteredName.trim(),
+        groupId,
+        createdAt: Timestamp.now(),
+        createdBy: user.uid,
+      })
+
+      setUnregisteredName('')
+      onClose()
+    } catch (error) {
+      console.error('Error creating unregistered user:', error)
+      alert(t('group.createUnregisteredError'))
+    } finally {
+      setCreatingUnregistered(false)
+    }
+  }
+
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>{t('group.addMemberTitle')}</DialogTitle>
         <DialogDescription>
           {t('group.addMemberDescription')}
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        {/* Mode Toggle */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMode('registered')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+              mode === 'registered'
+                ? 'bg-primary text-foreground shadow-brutal-sm'
+                : 'bg-white hover:bg-gray-50'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            {t('group.registeredUser')}
+          </button>
+          <button
+            onClick={() => setMode('unregistered')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 border-3 border-foreground text-sm font-semibold transition-all ${
+              mode === 'unregistered'
+                ? 'bg-primary text-foreground shadow-brutal-sm'
+                : 'bg-white hover:bg-gray-50'
+            }`}
+          >
+            <UserX className="h-4 w-4" />
+            {t('group.unregisteredUser')}
+          </button>
+        </div>
+
+        {mode === 'registered' ? (
+          <>
+            <div className="flex gap-2">
+              <Input
+                placeholder={t('group.addMemberSearchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch()
+                  }
+                }}
+              />
+              <Button onClick={handleSearch} disabled={searching}>
+                {searching ? t('group.searching') : t('common.search')}
+              </Button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="space-y-2">
+                {searchResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="flex items-center justify-between p-2 rounded border border-foreground"
+                  >
+                    <span className="font-medium">{result.displayName}</span>
+                    <Button
+                      size="sm"
+                      onClick={() => handleAddMember(result.id, result.displayName)}
+                      disabled={adding === result.id}
+                    >
+                      {adding === result.id ? t('group.addingMember') : t('common.add')}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {searchQuery && searchResults.length === 0 && !searching && (
+              <p className="text-center text-muted-foreground text-sm">
+                {t('group.addMemberNoResults')}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {t('group.unregisteredDescription')}
+            </p>
+            <div className="space-y-3">
+              <Input
+                placeholder={t('group.unregisteredNamePlaceholder')}
+                value={unregisteredName}
+                onChange={(e) => setUnregisteredName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && unregisteredName.trim()) {
+                    handleCreateUnregisteredUser()
+                  }
+                }}
+              />
+              <Button
+                onClick={handleCreateUnregisteredUser}
+                disabled={!unregisteredName.trim() || creatingUnregistered}
+                className="w-full"
+              >
+                {creatingUnregistered ? t('common.saving') : t('group.createUnregistered')}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </DialogContent>
+  )
+}
+
+// Link User Dialog Component
+function LinkUserDialog({
+  groupId,
+  memberToLink,
+  currentMembers,
+  onClose,
+}: {
+  groupId: string
+  memberToLink: GroupMember | null
+  currentMembers: GroupMember[]
+  onClose: () => void
+}) {
+  const { user } = useAuth()
+  const { t } = useI18n()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<{ id: string; displayName: string }[]>([])
+  const [searching, setSearching] = useState(false)
+  const [linking, setLinking] = useState<string | null>(null)
+
+  const currentMemberIds = currentMembers.map((m) => m.userId)
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      const usersRef = collection(db, 'users')
+      const q = query(
+        usersRef,
+        where('displayNameLower', '>=', searchQuery.toLowerCase()),
+        where('displayNameLower', '<=', searchQuery.toLowerCase() + '\uf8ff')
+      )
+
+      const snapshot = await getDocs(q)
+      const results: { id: string; displayName: string }[] = []
+      snapshot.forEach((doc) => {
+        // Only show users who are NOT already members of the group
+        if (!currentMemberIds.includes(doc.id)) {
+          results.push({
+            id: doc.id,
+            displayName: doc.data().displayName,
+          })
+        }
+      })
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Error searching users:', error)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleLinkUser = async (registeredUserId: string, registeredUserName: string) => {
+    if (!user || !memberToLink) return
+
+    setLinking(registeredUserId)
+    try {
+      // Get the unregistered user ID from the memberToLink
+      const unregisteredId = memberToLink.userId.replace('unregistered_', '')
+
+      // Update the unregisteredGroupUsers document with the linked user
+      await updateDoc(doc(db, 'unregisteredGroupUsers', unregisteredId), {
+        linkedToUserId: registeredUserId,
+        linkedAt: Timestamp.now(),
+      })
+
+      // Add the registered user as a new group member
+      await addDoc(collection(db, 'groupMembers'), {
+        groupId,
+        userId: registeredUserId,
+        userName: registeredUserName,
+        joinedAt: Timestamp.now(),
+      })
+
+      // Update group's memberIds array
+      await updateDoc(doc(db, 'groups', groupId), {
+        memberIds: arrayUnion(registeredUserId),
+      })
+
+      onClose()
+    } catch (error) {
+      console.error('Error linking user:', error)
+      alert(t('group.linkUserError'))
+    } finally {
+      setLinking(null)
+    }
+  }
+
+  if (!memberToLink) return null
+
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>{t('group.linkUserTitle')}</DialogTitle>
+        <DialogDescription>
+          {t('group.linkUserDescription', { name: memberToLink.userName })}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -962,10 +1319,11 @@ function AddMemberDialog({
                 <span className="font-medium">{result.displayName}</span>
                 <Button
                   size="sm"
-                  onClick={() => handleAddMember(result.id, result.displayName)}
-                  disabled={adding === result.id}
+                  onClick={() => handleLinkUser(result.id, result.displayName)}
+                  disabled={linking === result.id}
                 >
-                  {adding === result.id ? t('group.addingMember') : t('common.add')}
+                  <Link2 className="h-4 w-4 mr-1" />
+                  {linking === result.id ? t('group.linking') : t('group.link')}
                 </Button>
               </div>
             ))}

@@ -54,6 +54,18 @@ export interface GroupMember {
   userId: string
   userName: string
   joinedAt: Date
+  isUnregistered?: boolean
+  linkedToUserId?: string // When an unregistered user is linked to a registered user
+}
+
+export interface UnregisteredGroupUser {
+  id: string
+  name: string
+  groupId: string
+  createdAt: Date
+  createdBy: string
+  linkedToUserId?: string // The registered user this was linked to (if any)
+  linkedAt?: Date
 }
 
 export interface GroupMatch {
