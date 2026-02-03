@@ -843,6 +843,7 @@ function RecordMatchDialog({
   ]
 
   const togglePlayerTeamA = (playerId: string) => {
+    if (teamB.includes(playerId)) return
     if (teamA.includes(playerId)) {
       setTeamA(teamA.filter((id) => id !== playerId))
     } else {
@@ -852,6 +853,7 @@ function RecordMatchDialog({
   }
 
   const togglePlayerTeamB = (playerId: string) => {
+    if (teamA.includes(playerId)) return
     if (teamB.includes(playerId)) {
       setTeamB(teamB.filter((id) => id !== playerId))
     } else {
@@ -931,21 +933,25 @@ function RecordMatchDialog({
             {t('group.teamA')} ({teamA.length})
           </label>
           <div className="space-y-2">
-            {allPlayers.map((player) => (
-              <Button
-                key={player.id}
-                variant={teamA.includes(player.id) ? 'default' : 'outline'}
-                className="w-full justify-start"
-                onClick={() => togglePlayerTeamA(player.id)}
-              >
-                <span className="flex items-center gap-2">
-                  {player.name}
-                  {player.isUnregistered && (
-                    <UserX className="h-3 w-3 text-muted-foreground" />
-                  )}
-                </span>
-              </Button>
-            ))}
+            {allPlayers.map((player) => {
+              const isInTeamB = teamB.includes(player.id)
+              return (
+                <Button
+                  key={player.id}
+                  variant={teamA.includes(player.id) ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  disabled={isInTeamB}
+                  onClick={() => togglePlayerTeamA(player.id)}
+                >
+                  <span className="flex items-center gap-2">
+                    {player.name}
+                    {player.isUnregistered && (
+                      <UserX className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </span>
+                </Button>
+              )
+            })}
           </div>
         </div>
 
@@ -955,21 +961,25 @@ function RecordMatchDialog({
             {t('group.teamB')} ({teamB.length})
           </label>
           <div className="space-y-2">
-            {allPlayers.map((player) => (
-              <Button
-                key={player.id}
-                variant={teamB.includes(player.id) ? 'default' : 'outline'}
-                className="w-full justify-start"
-                onClick={() => togglePlayerTeamB(player.id)}
-              >
-                <span className="flex items-center gap-2">
-                  {player.name}
-                  {player.isUnregistered && (
-                    <UserX className="h-3 w-3 text-muted-foreground" />
-                  )}
-                </span>
-              </Button>
-            ))}
+            {allPlayers.map((player) => {
+              const isInTeamA = teamA.includes(player.id)
+              return (
+                <Button
+                  key={player.id}
+                  variant={teamB.includes(player.id) ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  disabled={isInTeamA}
+                  onClick={() => togglePlayerTeamB(player.id)}
+                >
+                  <span className="flex items-center gap-2">
+                    {player.name}
+                    {player.isUnregistered && (
+                      <UserX className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </span>
+                </Button>
+              )
+            })}
           </div>
         </div>
 
