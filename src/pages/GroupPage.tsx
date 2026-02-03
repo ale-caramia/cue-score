@@ -1254,11 +1254,75 @@ function LinkUserDialog({
       // Get the unregistered user ID from the memberToLink
       const unregisteredId = memberToLink.userId.replace('unregistered_', '')
 
-      // Update the unregisteredGroupUsers document with the linked user
-      await updateDoc(doc(db, 'unregisteredGroupUsers', unregisteredId), {
-        linkedToUserId: registeredUserId,
-        linkedAt: Timestamp.now(),
-      })
+      const unregisteredUserId = `unregistered_${unregisteredId}`
+
+      // Update group matches to replace the unregistered user with the registered user
+      const matchesSnapshot = await getDocs(
+        query(collection(db, 'groupMatches'), where('groupId', '==', groupId))
+      )
+
+      let batch = writeBatch(db)
+      let batchCount = 0
+
+      const replacePlayer = (ids: string[], names: string[]) => {
+        const updatedIds: string[] = []
+        const updatedNames: string[] = []
+
+        ids.forEach((id, index) => {
+          const name = names[index] ?? ''
+          const nextId = id === unregisteredUserId ? registeredUserId : id
+          const nextName = id === unregisteredUserId ? registeredUserName : name
+
+          if (updatedIds.includes(nextId)) {
+            return
+          }
+
+          updatedIds.push(nextId)
+          updatedNames.push(nextName)
+        })
+
+        return { updatedIds, updatedNames }
+      }
+
+      for (const matchDoc of matchesSnapshot.docs) {
+        const data = matchDoc.data()
+        const teamA: string[] = data.teamA || []
+        const teamB: string[] = data.teamB || []
+        const teamANames: string[] = data.teamANames || []
+        const teamBNames: string[] = data.teamBNames || []
+
+        if (!teamA.includes(unregisteredUserId) && !teamB.includes(unregisteredUserId)) {
+          continue
+        }
+
+        const updatedTeamA = replacePlayer(teamA, teamANames)
+        const updatedTeamB = replacePlayer(teamB, teamBNames)
+        const updatedAllPlayerIds = Array.from(
+          new Set([...updatedTeamA.updatedIds, ...updatedTeamB.updatedIds])
+        )
+
+        batch.update(matchDoc.ref, {
+          teamA: updatedTeamA.updatedIds,
+          teamB: updatedTeamB.updatedIds,
+          teamANames: updatedTeamA.updatedNames,
+          teamBNames: updatedTeamB.updatedNames,
+          allPlayerIds: updatedAllPlayerIds,
+        })
+        batchCount += 1
+
+        if (batchCount >= 450) {
+          await batch.commit()
+          batch = writeBatch(db)
+          batchCount = 0
+        }
+      }
+
+      if (batchCount > 0) {
+        await batch.commit()
+      }
+
+      // Remove the unregistered user entry now that data is reassigned
+      await deleteDoc(doc(db, 'unregisteredGroupUsers', unregisteredId))
 
       // Add the registered user as a new group member
       await addDoc(collection(db, 'groupMembers'), {
